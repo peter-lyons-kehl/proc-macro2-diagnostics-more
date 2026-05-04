@@ -22,11 +22,17 @@ pub type MacroDeepResult<T> = Result<T, DeepDiagnostic>;
 
 pub type Star = &'static str;
 pub type RefStar = &'static Star;
+
 pub type SliStar = &'static [Star];
-pub type OptSliStar = Option<SliStar>;
+pub type SloStar = &'static [Option<Star>];
+
 pub type SliSliStar = &'static [SliStar];
+pub type SloSloStar = &'static [Option<SloStar>];
 pub type RefSliSliStar = &'static SliSliStar;
+pub type RefSloSloStar = &'static SloSloStar;
+
 pub type SliSliSliStar = &'static [SliSliStar];
+pub type SloSloSloStar = &'static [Option<SloSloStar>];
 
 #[derive(Clone, Debug)]
 #[repr(transparent)]
@@ -41,31 +47,32 @@ impl FewSliStar {
 }
 #[derive(Clone, Debug)]
 #[repr(transparent)]
-struct FewOptSliStar([OptSliStar; 2]);
+struct FewOptSliStar([SloStar; 2]);
 impl FewOptSliStar {
-    fn description(&self) -> OptSliStar {
+    fn description(&self) -> SloStar {
         self.0[0]
     }
-    fn error(&self) -> OptSliStar {
+    fn error(&self) -> SloStar {
         self.0[1]
     }
 }
-//@TODO
-//
-//impl IntoIter for &FewSliStaS
-//
-// iter()
-//
-//impl Iterator
 
+// @TODO field total_length
+// - BUT, when composing, SKIP that level for internal parts - point direct = one level below
+// - Overlays: `usize`` param to assert the expected number of items in the overlayed, so that later
+//   modifications trigger changes.
+// - `const`
 #[derive(Clone, Debug)]
 enum DeepDiagnosticMessage {
     #[cfg(feature = "alloc")]
     OwnString(String),
-    //FewSli(FewSliStar),
-    //FewOptSli(FewOptSliStar),
     Sli(SliStar),
     SliSliSli(SliSliSliStar),
+    // @TODO
+    //
+    // SloStar,
+    //
+    // SloSloSloStar
 }
 
 #[derive(Clone, Debug)]
@@ -154,8 +161,8 @@ impl<'a> Iterator for MessageStarIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.0 {
             MessageStarIterEnum::OwnString(ref mut once) => once.next(),
-            MessageStarIterEnum::Sli(ref mut sli) => sli.next().map(|v| &**v),
-            MessageStarIterEnum::SliSliSli(ref mut sli_sli_sli) => sli_sli_sli.next().map(|v| &**v),
+            MessageStarIterEnum::Sli(ref mut sli) => sli.next().map(|v| *v),
+            MessageStarIterEnum::SliSliSli(ref mut sli_sli_sli) => sli_sli_sli.next().map(|v| *v),
         }
     }
 }
