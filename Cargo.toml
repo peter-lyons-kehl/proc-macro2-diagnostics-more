@@ -10,7 +10,7 @@ license = "BSD-2-Clause OR Apache-2.0 OR MIT"
 authors = ["Peter Lyons Kehl<peter.kehl@gmail.com>"]
 description = "Trait extensions and asserts to use with proc-macro2-diagnostics"
 
-categories = ["development-tools", "no-std", "rust-patterns"]
+categories = ["development-tools", "no-std", "no-std::no-alloc", "rust-patterns"]
 
 keywords = ["error-handling", "error-reporting", "macro", "macros", "panic"]
 
@@ -24,8 +24,11 @@ proc-macro2-diagnostics = { version = "0.10.1", optional = true }
 proc-macro2 = {version="1.0.60", features=["span-locations"], optional = true }
 
 [features]
-proc-macro2-diagnostics = ["proc-macro2", "dep:proc-macro2-diagnostics"]
-default = ["proc-macro2-diagnostics"]
+alloc = []
+proc-macro2-diagnostics = ["proc-macro2", "dep:proc-macro2-diagnostics", "alloc"]
+
+# default = ["proc-macro2-diagnostics"]
+ default = ["alloc"]
 
 [package.metadata.docs.rs]
 default-target = "x86_64-unknown-linux-gnu"
