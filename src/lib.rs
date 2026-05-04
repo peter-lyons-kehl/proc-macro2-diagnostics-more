@@ -5,6 +5,8 @@ extern crate alloc;
 
 #[cfg(feature = "alloc")]
 use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::borrow::ToOwned;
 
 #[cfg(feature = "proc-macro2-diagnostics")]
 use proc_macro2::Span;
@@ -98,7 +100,9 @@ pub mod ext {
     use crate::MacroResult;
     use crate::{sealed, DeepDiagnostic, MacroDeepResult};
 
+    #[cfg(feature = "alloc")]
     use alloc::format;
+    #[cfg(feature = "alloc")]
     use alloc::string::{String, ToString};
     use core::fmt::Debug;
 
@@ -453,7 +457,9 @@ pub mod assert {
     #[cfg(feature = "proc-macro2-diagnostics")]
     use crate::MacroResult;
 
+    #[cfg(feature = "alloc")]
     use alloc::string::String;
+    
     #[cfg(feature = "proc-macro2-diagnostics")]
     use proc_macro2::Span;
 
