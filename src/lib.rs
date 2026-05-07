@@ -4,11 +4,7 @@
 extern crate alloc;
 
 #[cfg(feature = "alloc")]
-use alloc::borrow::ToOwned;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-
-use core::iter::{self, Cloned, Flatten, Once};
 
 #[cfg(feature = "proc-macro2-diagnostics")]
 use proc_macro2::Span;
@@ -20,7 +16,7 @@ pub type MacroResult<T> = Result<T, Diagnostic>;
 
 pub type MacroDeepResult<T> = Result<T, DeepDiagnostic>;
 
-pub type Star = &'static str;
+/*pub type Star = &'static str;
 pub type RefStar = &'static Star;
 
 pub type SliStar = &'static [Star];
@@ -62,18 +58,11 @@ impl FewOptSliStar {
 // - Overlays: `usize`` param to assert the expected number of items in the overlayed, so that later
 //   modifications trigger changes.
 // - `const`
+*/
+//----
+
 #[derive(Clone, Debug)]
-enum DeepDiagnosticMessage {
-    #[cfg(feature = "alloc")]
-    OwnString(String),
-    Sli(SliStar),
-    SliSliSli(SliSliSliStar),
-    // @TODO
-    //
-    // SloStar,
-    //
-    // SloSloSloStar
-}
+struct DeepDiagnosticMessage(#[cfg(feature = "alloc")] String);
 
 #[derive(Clone, Debug)]
 pub struct DeepDiagnostic {
@@ -90,53 +79,12 @@ impl DeepDiagnostic {
             #[cfg(feature = "proc-macro2-diagnostics")]
             level: proc_macro2_diagnostics::Level::Error,
 
-            message: DeepDiagnosticMessage::OwnString(message.into()),
+            message: DeepDiagnosticMessage(message.into()),
         }
-    }
-    pub fn error_ref_star<T: Into<RefStar>>(message: T) -> Self {
-        Self::error_sli_star(core::slice::from_ref(message.into()))
-    }
-    pub fn error_sli_star<T: Into<SliStar>>(message: T) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: proc_macro2_diagnostics::Level::Error,
-
-            message: DeepDiagnosticMessage::Sli(message.into()),
-        }
-    }
-    pub fn error_ref_sli_sli_star<T: Into<RefSliSliStar>>(message: T) -> Self {
-        Self::error_sli_sli_sli_star(core::slice::from_ref(message.into()))
-    }
-    pub fn error_sli_sli_sli_star<T: Into<SliSliSliStar>>(message: T) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: proc_macro2_diagnostics::Level::Error,
-
-            message: DeepDiagnosticMessage::SliSliSli(message.into()),
-        }
-    }
-
-    pub fn message_stars<'a>(&'a self) -> MessageStarIter<'a> {
-        MessageStarIter(match &self.message {
-            #[cfg(feature = "alloc")]
-            // @TODO instead of clone(), use * asterisk
-            DeepDiagnosticMessage::OwnString(s) => {
-                MessageStarIterEnum::OwnString(iter::once(s.clone().leak()))
-            } //@TODO - LEAKS!
-            DeepDiagnosticMessage::Sli(s) => MessageStarIterEnum::Sli(s.iter()),
-            DeepDiagnosticMessage::SliSliSli(s) => {
-                MessageStarIterEnum::SliSliSli(s.iter().cloned().flatten().cloned().flatten())
-            }
-        })
     }
     #[cfg(feature = "alloc")]
-    pub fn message_string(&self) -> String {
-        match &self.message {
-            #[cfg(feature = "alloc")]
-            DeepDiagnosticMessage::OwnString(s) => s.clone(),
-            //DeepDiagnosticMessage::Slices(s) => (*s).to_owned(),
-            _ => todo!(),
-        }
+    pub fn message_string(self) -> String {
+        self.message.0
     }
 
     // @TODO if implemented in proc_macro2_diagnostics, make it accept MultiSpan:
@@ -147,6 +95,9 @@ impl DeepDiagnostic {
         Diagnostic::spanned(span, self.level, Into::<String>::into(self))
     }
 }
+
+/*
+use core::iter::{self, Cloned, Flatten, Once};
 
 enum MessageStarIterEnum<'a> {
     OwnString(Once<Star>), //@TODO - LEAKS!
@@ -165,24 +116,12 @@ impl<'a> Iterator for MessageStarIter<'a> {
             MessageStarIterEnum::SliSliSli(ref mut sli_sli_sli) => sli_sli_sli.next().map(|v| *v),
         }
     }
-}
+}*/
 
-// We do NOT have a similar
-//
-// impl<'a> From<DeepDiagnostic> for &'a str {...}
-//
-// because for DeepDiagnosticMessage::Owned it would have to LEAK!
-//
-// Instead, use method DeepDiagnostic::message_str.
 #[cfg(feature = "alloc")]
 impl From<DeepDiagnostic> for String {
     fn from(_deep: DeepDiagnostic) -> Self {
         todo!()
-        /*match deep.message {
-            #[cfg(feature = "alloc")]
-            DeepDiagnosticMessage::Owned(s) => s,
-            DeepDiagnosticMessage::Slices(s) => s.to_owned(),
-        }*/
     }
 }
 
@@ -217,6 +156,22 @@ pub mod ext {
     impl<T> sealed::Trait for MacroDeepResult<T> {
         #[allow(private_interfaces)]
         fn _seal(&self, _: &sealed::TraitParam) {}
+    }
+
+    pub struct Auto;
+    impl AsRef<usize> for Auto {
+        fn as_ref(&self) -> &usize {
+            todo!()
+        }
+    }
+    impl core::ops::Deref for Auto {
+        type Target = usize;
+        fn deref(&self) -> &Self::Target {
+            todo!()
+        }
+    }
+    fn _auto_convert(a: &Auto) -> usize {
+        **a
     }
 
     #[cfg(feature = "alloc")]
