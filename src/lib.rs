@@ -133,14 +133,29 @@ pub trait Displays02Trait: Display {
 }
 pub trait DisplayOther: Display {} //@TODO make sealed
 impl<T: Display> DisplayOther for T {}
-pub struct Empty; //@TODO make sealed
-impl Display for Empty {
+
+/// Default type param for [Displays02Plus]'s generic param `OTHER`. We can't use unit type `()`,
+/// because Rust may add [Display] `impl` for it later.
+///
+/// But we need [Display] to by auto-implemented for any types that `impl` [DisplayOther]. The
+/// choices are
+/// - [DisplayOther] NOT extending [Display], and a blanket `impl` of [DisplayOther] for any type
+///   implementing [Display] - but then not possible to use unit type `()` as a default generic
+///   param for [Displays02Plus]; or
+/// - [DisplayOther] extending [Display], and the same blanket `impl` as considered above; then
+///   [Displays02Plus] has the default generic param [Never] that we we manually implement [Display]
+///   for, so that [Never] does gets its blanket [DisplayOther].
+///
+/// NOT exactly like Rust's "never" type. Currently will most likely NOT be optimized out in enum
+/// variants etc. But it may be replaced with Rust "never" type once that is stable.
+pub struct Never(());
+impl Display for Never {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Ok(())
     }
 }
 
-pub enum Displays02Plus<T01: Display, T02: Display, OTHER: DisplayOther = Empty> {
+pub enum Displays02Plus<T01: Display, T02: Display, OTHER: DisplayOther = Never> {
     //@TODO separate enum, and wrap transparent
     T01(T01),
     T02(T02),
@@ -170,21 +185,20 @@ impl<F, I: ImplFrom<F>> IntoImpl<I> for F {
     }
 }
 /*impl<T01: Display, T02: Display, OTHER: DisplayOther, FROM> From<FROM>
-for Displays02Plus<T01, T02, OTHER>*/
+for Displays02Plus<T01, T02, OTHER>
+// \--- that was generating conflicts with core::convert blanket impl of From<T> for T.
+*/
 impl<T01: Display, T02: Display, OTHER: DisplayOther, FROM> ImplFrom<FROM>
     for Displays02Plus<T01, T02, OTHER>
 where
     OTHER: From<FROM>,
 {
-    /*fn into_impl(value: FROM) -> Self {
-        Self::Other(value.into())
-    }*/
     fn impl_from(f: FROM) -> Self {
         Self::Other(f.into())
     }
 }
 
-pub type Displays02<T01, T02> = Displays02Plus<T01, T02, Empty>;
+pub type Displays02<T01, T02> = Displays02Plus<T01, T02, Never>;
 
 impl<T01: Display, T02: Display, OTHER: Display> Displays02Plus<T01, T02, OTHER> {
     pub fn new_01(v: T01) -> Self {
@@ -248,6 +262,13 @@ impl<T01: Display> MoveIntoDisplays02 for T01 {
         todo!()
     }
 }*/
+
+/// 8-bit [Display] values. Not excellent for mass storage as the enum determinant also takes 8 bits.
+pub enum Display8Bits {
+    Bool(bool),
+    U8(u8),
+    I8(i8),
+}
 
 //--------
 
