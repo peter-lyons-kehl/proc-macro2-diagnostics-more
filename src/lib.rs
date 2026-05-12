@@ -144,7 +144,7 @@ impl Display for Never {
     }
 }
 
-pub enum Displays02Plus<T01: Display, T02: Display, OTHER: Display = Never> {
+pub enum Displays02Plus<T01: Display = Never, T02: Display = Never, OTHER: Display = Never> {
     //@TODO separate enum, and wrap transparent
     T01(T01),
     T02(T02),
@@ -217,15 +217,28 @@ impl<T01: Display, T02: Display, OTHER: Display> Displays02Plus<T01, T02, OTHER>
         apply(self.inner_ref())
     }*/
 }
-impl<T01: Display, T02: Display> Display for Displays02Plus<T01, T02> {
+impl<T01: Display, T02: Display, OTHER: Display> Display for Displays02Plus<T01, T02, OTHER> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Self::by_ref(&self, |s| s.fmt(f))
     }
 }
-impl<T01: Display, T02: Display> Displays02Trait for Displays02Plus<T01, T02> {
+impl<T01: Display, T02: Display, OTHER: Display> Displays02Trait
+    for Displays02Plus<T01, T02, OTHER>
+{
     type T01 = T01;
     type T02 = T02;
 }
+
+/// Without traits like [Displays02PlusTrait], having generic param `OTHER` (rather than using its
+/// default) in `impl` of [Display] for [Displays02Plus] makes calls like
+/// `Displays02Plus::new_01(true)` ambiguous if that function's return type is just `impl
+/// Displays02Trait` (or `impl Display`).
+pub trait Displays02PlusTrait<OTHER: Display = Never>: Displays02Trait {}
+impl<T01: Display, T02: Display, OTHER: Display> Displays02PlusTrait<OTHER>
+    for Displays02Plus<T01, T02, OTHER>
+{
+}
+
 /*impl<T01: Display, T02: Display> From<T01> for Displays02<T01, T02> {
     fn from(value: T01) -> Self {
         Self::new_01(value)
@@ -251,6 +264,64 @@ impl<T01: Display> MoveIntoDisplays02 for T01 {
         todo!()
     }
 }*/
+
+type Displays01<T, OTHER = Never> = Displays02Plus<T, OTHER>;
+pub trait Displays01PlusExt01<T01: Display> {
+    //@TODO seal
+    fn into_01(self) -> Displays02Plus<T01>;
+}
+impl<T01: Display> Displays01PlusExt01<T01> for T01 {
+    fn into_01(self) -> Displays02Plus<T01> {
+        Displays02Plus::new_01(self)
+    }
+}
+
+pub trait Displays02PlusExt01<T01: Display, T02: Display> {
+    //@TODO seal
+    fn into_01(self) -> Displays02Plus<T01, T02>;
+}
+pub trait Displays02PlusExt02<T01: Display, T02: Display> {
+    fn into_02(self) -> Displays02Plus<T01, T02>;
+}
+impl<T01: Display, T02: Display> Displays02PlusExt01<T01, T02> for T01 {
+    fn into_01(self) -> Displays02Plus<T01, T02> {
+        Displays02Plus::new_01(self)
+    }
+}
+impl<T01: Display, T02: Display> Displays02PlusExt02<T01, T02> for T02 {
+    fn into_02(self) -> Displays02Plus<T01, T02> {
+        Displays02Plus::new_02(self)
+    }
+}
+
+/// @TODO finish
+pub trait Displays03PlusExt01<T01: Display, T02: Display, T03: Display> {
+    //@TODO seal
+    fn into_01(self) -> Displays02Plus<T01, T02>; //@TODO Displays03Plus
+}
+
+pub trait Displays03PlusExt02<T01: Display, T02: Display, T03: Display> {
+    fn into_02(self) -> Displays02Plus<T01, T02>;
+}
+pub trait Displays03PlusExt03<T01: Display, T02: Display, T03: Display> {
+    fn into_03(self) -> Displays02Plus<T01, T02>;
+}
+
+impl<T01: Display, T02: Display, T03: Display> Displays03PlusExt01<T01, T02, T03> for T01 {
+    fn into_01(self) -> Displays02Plus<T01, T02> {
+        Displays02Plus::new_01(self)
+    }
+}
+impl<T01: Display, T02: Display, T03: Display> Displays03PlusExt02<T01, T02, T03> for T02 {
+    fn into_02(self) -> Displays02Plus<T01, T02> {
+        Displays02Plus::new_02(self)
+    }
+}
+impl<T01: Display, T02: Display, T03: Display> Displays03PlusExt03<T01, T02, T03> for T03 {
+    fn into_03(self) -> Displays02Plus<T01, T02> {
+        todo!() //Displays03Plus::new_03(self)
+    }
+}
 
 /// 8-bit [Display] values. Not excellent for mass storage as the enum determinant also takes 8 bits.
 pub enum Display8Bits {
@@ -295,6 +366,7 @@ pub enum Display32Bits {
     I32(i32),
     Char(char),
     F32(f32),
+    //@TODO primitives + &'static str
 }
 impl Display for Display32Bits {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -391,38 +463,65 @@ pub fn ret_disp() -> impl Display {
     }
 }
 
-pub fn ret_result_displ() -> Result<(), impl Display> {
-    ret_result_displ2trait()
-}
-pub fn ret_result_displ2trait() -> Result<(), impl Displays02Trait> {
-    //pub fn ret_result() -> Result<(), impl Display> {
-    let result_1 = Err(if true {
-        // @TODO Displays02: take a generic param like Display8, Display16, Display32...
-        // - all implement a tiny trait DisplayFixed
-        //
-        // then have blanket:
-        //
-        // impl<F, DF: DisplayFixed + From<F>> From<F> for Displays02<DF> { forward-here }
-        Displays02Plus::new_01(true) //@TODO:
-                                     // -extension method for T01, T02... - blanket for all Sized
-                                     // -extension method for Result<..., ...> success
-                                     // -extension method for Result<..., ...> error
-    } else {
-        Displays02Plus::new_02("hi")
-    });
-    let _ = result_1?;
+pub mod import_selected_ext {
+    use crate::{Displays01, Displays01PlusExt01, Displays02PlusTrait, Never};
+    use core::fmt::Display;
 
-    let result_2 = Err(if true {
-        Displays02Plus::new_01(false)
-    } else {
-        //let value = 1;
-        Displays02Plus::new_02("bye")
-        // DisplayFromFn::new(move |f| write!(f, "hi {value}"))
-    });
-    //let _ = result_2?;
-    //
-    //Ok(())
-    result_2
+    pub fn ret_result_displ() -> Result<(), impl Display> {
+        ret_result_displ2trait()
+    }
+    pub fn ret_result_displ2trait() -> Result<(), impl Displays02PlusTrait> {
+        //pub fn ret_result_displ2trait() -> Result<(), impl Displays02PlusTrait> {
+        let result_1 = Err(if true {
+            // @TODO Displays02: take a generic param like Display8, Display16, Display32...
+            // - all implement a tiny trait DisplayFixed
+            //
+            // then have blanket:
+            //
+            // impl<F, DF: DisplayFixed + From<F>> From<F> for Displays02<DF> { forward-here }
+
+            Displays01::new_01("oh")
+            // problem:
+            //
+            //Displays02Plus::new_01("oh")
+
+            //Displays02Plus::<_, bool>::new_01("oh")
+
+            // @TODO:
+            // - extension method for T01, T02... - blanket for all Sized
+            // - extension method for Result<..., ...> success
+            // - extension method for Result<..., ...> error
+        } else {
+            //Displays02Plus::new_02(true)
+
+            Displays01::new_01("hi")
+            // problem:
+            //
+            //Displays02Plus::new_01("hi")
+        });
+        let _ = result_1?;
+
+        let result_2 = Err(if true {
+            Displays01::new_01("hu")
+            //Displays02Plus::new_01("hu")
+        } else {
+            //Displays02Plus::new_02(false)
+            if false {
+                Displays01::new_01("bye")
+                //Displays02Plus::new_01("bye")
+            } else {
+                "bye".into_01()
+            }
+
+            //let value = 1;
+            //
+            // DisplayFromFn::new(move |f| write!(f, "hi {value}"))
+        });
+        //let _ = result_2?;
+        //
+        //Ok(())
+        result_2
+    }
 }
 
 #[repr(transparent)]
@@ -480,10 +579,13 @@ impl From<DeepDiagnostic> for String {
     }
 }
 
+/// Intentionally not public - used to indicate a sealed trait.
+struct SealedTraitFunParam;
+
 pub mod ext {
     #[cfg(feature = "proc-macro2-diagnostics")]
     use crate::MacroResult;
-    use crate::{sealed, MacroDeepResult};
+    use crate::{MacroDeepResult, SealedTraitFunParam};
 
     #[cfg(feature = "alloc")]
     use alloc::format;
@@ -497,7 +599,7 @@ pub mod ext {
     use proc_macro2_diagnostics::{Diagnostic, SpanDiagnosticExt as _};
 
     #[cfg(feature = "proc-macro2-diagnostics")]
-    pub trait MacroDeepResultExt<T>: sealed::Trait {
+    pub trait MacroDeepResultExt<T> {
         // @TODO if implemented in proc_macro2_diagnostics, make it accept MultiSpan.
         /// Add the given [Span], and transform to [MacroResult].
         fn spanned(self, span: Span) -> MacroResult<T>;
@@ -507,10 +609,8 @@ pub mod ext {
         fn spanned(self, span: Span) -> MacroResult<T> {
             self.map_err(|deep_err| deep_err.spanned(span))
         }
-    }
-    impl<T> sealed::Trait for MacroDeepResult<T> {
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam);
     }
 
     pub struct Auto;
@@ -549,7 +649,7 @@ pub mod ext {
         // Sealing is not really necessary, because we have a blanket impl that covers any and
         // all eligible types, so no other types can implement this trait.
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
     impl<T: Into<String>> IntoStringExt for T {
@@ -578,7 +678,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     #[cfg(feature = "alloc")]
@@ -593,7 +693,7 @@ pub mod ext {
         fn map_error_into_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T>;
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
     impl<T, E: Into<String>> ResultErrIntoStringExt<T> for Result<T, E> {
@@ -623,7 +723,7 @@ pub mod ext {
             })
         }
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     pub trait OptionOrBoolExt<T> {
@@ -634,7 +734,7 @@ pub mod ext {
         fn ok_or_error_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T>;
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     impl<T> OptionOrBoolExt<T> for Option<T> {
         #[cfg(feature = "alloc")]
@@ -648,7 +748,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
     impl OptionOrBoolExt<()> for bool {
         #[cfg(feature = "alloc")]
@@ -671,7 +771,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     #[cfg(feature = "alloc")]
@@ -685,7 +785,7 @@ pub mod ext {
         fn to_error_with_at<F: Fn() -> String>(&self, f: F, span: Span) -> Diagnostic;
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
     impl<T: ToString> ToStringExt for T {
@@ -712,7 +812,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     #[cfg(feature = "alloc")]
@@ -727,7 +827,7 @@ pub mod ext {
         fn map_error_to_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T>;
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
     impl<T, E: ToString> ResultErrToStringExt<T> for Result<T, E> {
@@ -758,7 +858,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     pub trait DebugExt: Debug {
@@ -774,7 +874,7 @@ pub mod ext {
         fn dbg_error_with_at<F: Fn() -> String>(self, f: F, span: Span) -> Diagnostic;
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
 
     #[cfg(feature = "alloc")]
@@ -803,7 +903,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     #[cfg(feature = "alloc")]
@@ -818,7 +918,7 @@ pub mod ext {
         fn map_error_dbg_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T>;
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam);
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
     impl<T, E: Debug> ResultErrDebugExt<T> for Result<T, E> {
@@ -849,7 +949,7 @@ pub mod ext {
         }
 
         #[allow(private_interfaces)]
-        fn _seal(&self, _: &sealed::TraitParam) {}
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 }
 
@@ -875,14 +975,5 @@ pub mod assert {
     #[cfg(feature = "proc-macro2-diagnostics")] //@TODO was true_or_error_at
     pub fn true_or_error_with_at<F: Fn() -> String>(b: bool, f: F, span: Span) -> MacroResult<()> {
         b.ok_or_error_with_at(f, span)
-    }
-}
-
-pub mod sealed {
-    /// Intentionally NOT public.
-    pub(crate) struct TraitParam;
-    pub trait Trait {
-        #[allow(private_interfaces)]
-        fn _seal(&self, _: &TraitParam);
     }
 }
