@@ -6,6 +6,7 @@ extern crate alloc;
 #[cfg(feature = "alloc")]
 use alloc::string::String;
 
+use core::any::Any;
 use core::fmt::{self, Display, Formatter};
 
 #[cfg(feature = "proc-macro2-diagnostics")]
@@ -16,7 +17,7 @@ use proc_macro2_diagnostics::Diagnostic;
 #[cfg(feature = "proc-macro2-diagnostics")]
 pub type MacroResult<T> = Result<T, Diagnostic>;
 
-pub type MacroDeepResult<T> = Result<T, DeepDiagnostic>;
+pub type MacroDeepResult<T, M: Display> = Result<T, DeepDiagnostic<M>>;
 
 /*pub type Star = &'static str;
 pub type RefStar = &'static Star;
@@ -63,31 +64,24 @@ impl FewOptSliStar {
 */
 //----
 
-#[cfg(feature = "alloc")]
+// @TODO SEAL!
 #[derive(Clone, Debug)]
-struct DeepDiagnosticMessage(#[cfg(feature = "alloc")] String);
-
-#[derive(Clone, Debug)]
-pub struct DeepDiagnostic {
+pub struct DeepDiagnostic<M: Display> {
     #[cfg(feature = "proc-macro2-diagnostics")]
     level: proc_macro2_diagnostics::Level,
-    #[cfg(feature = "alloc")]
-    message: DeepDiagnosticMessage,
+
+    message: M,
 }
-impl DeepDiagnostic {
+impl<M: Display> DeepDiagnostic<M> {
     // @TODO macro_rules and also generate: pub fn warning, note, help
     #[cfg(feature = "alloc")]
-    pub fn error_string<T: Into<String>>(message: T) -> Self {
+    pub fn error_string<T: Into<M>>(message: T) -> Self {
         Self {
             #[cfg(feature = "proc-macro2-diagnostics")]
             level: proc_macro2_diagnostics::Level::Error,
 
-            message: DeepDiagnosticMessage(message.into()),
+            message: message.into(),
         }
-    }
-    #[cfg(feature = "alloc")]
-    pub fn message_string(self) -> String {
-        self.message.0
     }
 
     // @TODO if implemented in proc_macro2_diagnostics, make it accept MultiSpan:
@@ -97,23 +91,28 @@ impl DeepDiagnostic {
     pub fn spanned(self, span: Span) -> Diagnostic {
         Diagnostic::spanned(span, self.level, Into::<String>::into(self))
     }
-
-    #[cfg(feature = "alloc")]
-    pub fn to_string_direct(&self) -> String {
-        self.message.0.clone()
+}
+/* // Probably not much faster (if at all) than .to_string()
+#[cfg(feature = "alloc")]
+impl<M: Display + Any> DeepDiagnostic<M> {
+    pub fn to_string_clone(&self) -> String {
+        let message = &self.message as &dyn Any;
+        match message.downcast_ref::<String>() {
+            Some(as_string) => as_string.clone(),
+            None => self.message.to_string(),
+        }
     }
-    #[cfg(feature = "alloc")]
-    pub fn to_string_move(self) -> String {
-        self.message.0
+}*/
+impl<M: Display> Display for DeepDiagnostic<M> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.message.fmt(f)
     }
 }
-impl Display for DeepDiagnostic {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        #[cfg(feature = "alloc")]
-        self.message.0.fmt(f)?;
-        #[cfg(not(feature = "alloc"))]
-        "proc_macro2_diagnostics_more::DeepDiagnostic".fmt(f)?;
-        Ok(())
+
+#[cfg(feature = "alloc")]
+impl DeepDiagnostic<String> {
+    pub fn to_string_move(self) -> String {
+        self.message
     }
 }
 
@@ -167,12 +166,12 @@ pub mod by_dyn {
     }*/
 }
 
-#[cfg(feature = "alloc")]
+/*#[cfg(feature = "alloc")]
 impl From<DeepDiagnostic> for String {
     fn from(deep: DeepDiagnostic) -> Self {
         deep.message.0
     }
-}
+}*/
 
 /// Intentionally not public - used to indicate a sealed trait.
 struct SealedTraitFunParam;
@@ -200,6 +199,7 @@ pub mod ext {
         // @TODO if implemented in proc_macro2_diagnostics, make it accept MultiSpan.
         /// Add the given [Span], and transform to [MacroResult].
         fn spanned(self, span: Span) -> MacroResult<T>;
+        fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "proc-macro2-diagnostics")]
     impl<T> MacroDeepResultExt<T> for MacroDeepResult<T> {
@@ -207,7 +207,7 @@ pub mod ext {
             self.map_err(|deep_err| deep_err.spanned(span))
         }
         #[allow(private_interfaces)]
-        fn _seal(&self, _: SealedTraitFunParam);
+        fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
     pub struct Auto;
