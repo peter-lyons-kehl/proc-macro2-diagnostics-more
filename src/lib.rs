@@ -208,7 +208,7 @@ impl Display for Display32Bits {
 /// impl<T: Display + core::error::Error> DisplayAndError for T {}
 /// ```
 pub mod by_dyn {
-    macro_rules! variants {
+    /*macro_rules! variants {
         ($vis:vis $enum:ident : $trait:path:ty
             (
                 $(
@@ -237,7 +237,7 @@ pub mod by_dyn {
                 ),+
             )
         ) => {};
-    }
+    }*/
 }
 
 #[cfg(feature = "alloc")]
@@ -251,6 +251,8 @@ impl From<DeepDiagnostic> for String {
 struct SealedTraitFunParam;
 
 pub mod ext {
+    #[cfg(feature = "alloc")]
+    use crate::DeepDiagnostic;
     #[cfg(feature = "proc-macro2-diagnostics")]
     use crate::MacroResult;
     use crate::{MacroDeepResult, SealedTraitFunParam};

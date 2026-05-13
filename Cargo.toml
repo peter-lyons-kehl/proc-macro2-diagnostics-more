@@ -28,7 +28,7 @@ alloc = []
 proc-macro2-diagnostics = ["proc-macro2", "dep:proc-macro2-diagnostics", "alloc"]
 
 # default = ["proc-macro2-diagnostics"]
-# default = ["alloc"]
+ default = ["alloc"]
 
 [package.metadata.docs.rs]
 default-target = "x86_64-unknown-linux-gnu"
