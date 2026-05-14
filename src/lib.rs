@@ -23,51 +23,6 @@ pub type MacroDeepResult<T, M = String> = Result<T, DeepDiagnostic<M>>;
 #[cfg(not(feature = "alloc"))]
 pub type MacroDeepResult<T, M> = Result<T, DeepDiagnostic<M>>;
 
-/*pub type Star = &'static str;
-pub type RefStar = &'static Star;
-
-pub type SliStar = &'static [Star];
-pub type SloStar = &'static [Option<Star>];
-
-pub type SliSliStar = &'static [SliStar];
-pub type SloSloStar = &'static [Option<SloStar>];
-pub type RefSliSliStar = &'static SliSliStar;
-pub type RefSloSloStar = &'static SloSloStar;
-
-pub type SliSliSliStar = &'static [SliSliStar];
-pub type SloSloSloStar = &'static [Option<SloSloStar>];
-
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct FewSliStar([SliStar; 2]);
-impl FewSliStar {
-    fn description(&self) -> SliStar {
-        self.0[0]
-    }
-    fn error(&self) -> SliStar {
-        self.0[1]
-    }
-}
-#[derive(Clone, Debug)]
-#[repr(transparent)]
-struct FewOptSliStar([SloStar; 2]);
-impl FewOptSliStar {
-    fn description(&self) -> SloStar {
-        self.0[0]
-    }
-    fn error(&self) -> SloStar {
-        self.0[1]
-    }
-}
-
-// @TODO field total_length
-// - BUT, when composing, SKIP that level for internal parts - point direct = one level below
-// - Overlays: `usize`` param to assert the expected number of items in the overlayed, so that later
-//   modifications trigger changes.
-// - `const`
-*/
-//----
-
 // @TODO SEAL!
 #[cfg(feature = "alloc")]
 #[derive(Clone, Debug)]
@@ -88,7 +43,7 @@ pub struct DeepDiagnostic<M: Display> {
 impl<M: Display> DeepDiagnostic<M> {
     // @TODO macro_rules and also generate: pub fn warning, note, help
     #[cfg(feature = "alloc")]
-    pub fn error_string<T: Into<M>>(message: T) -> Self {
+    pub fn error_from_string<T: Into<M>>(message: T) -> Self {
         Self {
             #[cfg(feature = "proc-macro2-diagnostics")]
             level: proc_macro2_diagnostics::Level::Error,
@@ -122,8 +77,14 @@ impl<M: Display> Display for DeepDiagnostic<M> {
     }
 }
 #[cfg(feature = "alloc")]
+impl DeepDiagnostic<String> {
+    pub fn to_string_move(self) -> String {
+        self.message
+    }
+}
+#[cfg(feature = "alloc")]
 impl<M: Display + 'static> DeepDiagnostic<M> {
-    pub fn to_string_move(mut self) -> String {
+    pub fn to_string_move_maybe(mut self) -> String {
         let self_mut = &mut self as &mut dyn Any;
         match self_mut.downcast_mut::<DeepDiagnostic<String>>() {
             Some(as_string_based) => core::mem::take(&mut as_string_based.message),
@@ -132,6 +93,7 @@ impl<M: Display + 'static> DeepDiagnostic<M> {
     }
 }
 
+/// Intentionally not public - used to indicate a sealed trait.
 enum SealedTraitFunParam {}
 //--------
 /// Similar (but only partially) to [enum_dispatch](https://crates.io/crates/enum_dispatch) and
@@ -265,13 +227,13 @@ pub mod ext_all {
     #[cfg(feature = "alloc")]
     impl<T: Into<String>> IntoStringExt for T {
         fn into_error(self) -> DeepDiagnostic {
-            DeepDiagnostic::error_string(self.into())
+            DeepDiagnostic::error_from_string(self.into())
         }
         fn into_error_with<F: Fn() -> String>(self, f: F) -> DeepDiagnostic {
             let mut s = f();
             s.push(' ');
             s.push_str(&self.into());
-            DeepDiagnostic::error_string(s)
+            DeepDiagnostic::error_from_string(s)
         }
 
         /// Convenience function: same as into_error().span(span)
@@ -309,14 +271,14 @@ pub mod ext_all {
     #[cfg(feature = "alloc")]
     impl<T, E: Into<String>> ResultErrIntoStringExt<T> for Result<T, E> {
         fn map_error_into(self) -> MacroDeepResult<T> {
-            self.map_err(|e| DeepDiagnostic::error_string(e))
+            self.map_err(|e| DeepDiagnostic::error_from_string(e))
         }
         fn map_error_into_with<F: Fn() -> String>(self, f: F) -> MacroDeepResult<T> {
             self.map_err(|e| {
                 let mut s = f();
                 s.push(' ');
                 s.push_str(&e.into());
-                DeepDiagnostic::error_string(s)
+                DeepDiagnostic::error_from_string(s)
             })
         }
 
@@ -350,7 +312,7 @@ pub mod ext_all {
     impl<T> OptionOrBoolExt<T> for Option<T> {
         #[cfg(feature = "alloc")]
         fn ok_or_error_with<F: Fn() -> String>(self, f: F) -> MacroDeepResult<T> {
-            self.ok_or_else(|| DeepDiagnostic::error_string(f()))
+            self.ok_or_else(|| DeepDiagnostic::error_from_string(f()))
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -368,7 +330,7 @@ pub mod ext_all {
             if self {
                 Ok(())
             } else {
-                Err(DeepDiagnostic::error_string(f()))
+                Err(DeepDiagnostic::error_from_string(f()))
             }
         }
 
@@ -401,13 +363,13 @@ pub mod ext_all {
     #[cfg(feature = "alloc")]
     impl<T: ToString> ToStringExt for T {
         fn to_error(&self) -> DeepDiagnostic {
-            DeepDiagnostic::error_string(self.to_string())
+            DeepDiagnostic::error_from_string(self.to_string())
         }
         fn to_error_with<F: Fn() -> String>(&self, f: F) -> DeepDiagnostic {
             let mut s = f();
             s.push(' ');
             s.push_str(&self.to_string());
-            DeepDiagnostic::error_string(s)
+            DeepDiagnostic::error_from_string(s)
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -443,14 +405,14 @@ pub mod ext_all {
     #[cfg(feature = "alloc")]
     impl<T, E: ToString> ResultErrToStringExt<T> for Result<T, E> {
         fn map_error_to(self) -> MacroDeepResult<T> {
-            self.map_err(|e| DeepDiagnostic::error_string(e.to_string()))
+            self.map_err(|e| DeepDiagnostic::error_from_string(e.to_string()))
         }
         fn map_error_to_with<F: Fn() -> String>(self, f: F) -> MacroDeepResult<T> {
             self.map_err(|e| {
                 let mut s = f();
                 s.push(' ');
                 s.push_str(&e.to_string());
-                DeepDiagnostic::error_string(s)
+                DeepDiagnostic::error_from_string(s)
             })
         }
 
@@ -492,13 +454,13 @@ pub mod ext_all {
     impl<T: Debug> DebugExt for T {
         #[cfg(feature = "alloc")]
         fn dbg_error(&self) -> DeepDiagnostic {
-            DeepDiagnostic::error_string(format!("{self:?}"))
+            DeepDiagnostic::error_from_string(format!("{self:?}"))
         }
         fn dbg_error_with<F: Fn() -> String>(self, f: F) -> DeepDiagnostic {
             let mut s = f();
             s.push(' ');
             s.push_str(&format!("{self:?}"));
-            DeepDiagnostic::error_string(s)
+            DeepDiagnostic::error_from_string(s)
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -534,14 +496,14 @@ pub mod ext_all {
     #[cfg(feature = "alloc")]
     impl<T, E: Debug> ResultErrDebugExt<T> for Result<T, E> {
         fn map_error_dbg(self) -> MacroDeepResult<T> {
-            self.map_err(|e| DeepDiagnostic::error_string(format!("{e:?}")))
+            self.map_err(|e| DeepDiagnostic::error_from_string(format!("{e:?}")))
         }
         fn map_error_dbg_with<F: Fn() -> String>(self, f: F) -> MacroDeepResult<T> {
             self.map_err(|e| {
                 let mut s = f();
                 s.push(' ');
                 s.push_str(&format!("{e:?}"));
-                DeepDiagnostic::error_string(s)
+                DeepDiagnostic::error_from_string(s)
             })
         }
 
