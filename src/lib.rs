@@ -248,7 +248,6 @@ pub mod ext_all {
             self.0(fmt, &self.1)
         }
     }
-    #[cfg(feature = "alloc")]
     impl<M: Display, T: Into<M>> MsgIntoDisplayExt<M> for T {
         fn into_error(self) -> DeepDiagnostic<M> {
             DeepDiagnostic::new_error(self.into())
@@ -287,11 +286,15 @@ pub mod ext_all {
 
     pub trait ResultErrIntoDisplayExt<M: Display, T> {
         fn map_error_into(self) -> MacroDeepResult<T, M>;
-        fn map_error_into_with<F: Fn() -> M>(self, f: F) -> MacroDeepResult<T, impl Display>;
+        fn map_error_into_with<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+        ) -> MacroDeepResult<T, impl Display>;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn map_error_into_at(self, span: Span) -> MacroResult<T>;
-        #[cfg(feature = "proc-macro2-diagnostics")]
+        // @TODO FM: Into<impl Display> via a yet-another generic FD
+        #[cfg(feature = "proc-macro2-diagnostics")] //@TODO replace -> String with FM: Display and -> FM
         fn map_error_into_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T>;
 
         #[allow(private_interfaces)]
@@ -301,7 +304,10 @@ pub mod ext_all {
         fn map_error_into(self) -> MacroDeepResult<T, M> {
             self.map_err(|e| DeepDiagnostic::new_error(e))
         }
-        fn map_error_into_with<F: Fn() -> M>(self, f: F) -> MacroDeepResult<T, impl Display> {
+        fn map_error_into_with<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+        ) -> MacroDeepResult<T, impl Display> {
             self.map_err(|e| {
                 let display = DisplayFromFnAndData(
                     |fmt, d| {
@@ -464,32 +470,35 @@ pub mod ext_all {
     }
 
     pub trait DebugExt: Debug {
-        #[cfg(feature = "alloc")]
-        fn dbg_error(&self) -> DeepDiagnostic;
+        fn dbg_error(&self) -> DeepDiagnostic<impl Display>;
 
-        #[cfg(feature = "alloc")]
-        fn dbg_error_with<F: Fn() -> String>(self, f: F) -> DeepDiagnostic;
+        #[cfg(feature = "alloc")] //@TODO no-alloc
+        fn dbg_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display>;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn dbg_error_at(&self, span: Span) -> Diagnostic;
-        #[cfg(feature = "proc-macro2-diagnostics")]
+        #[cfg(feature = "proc-macro2-diagnostics")] //@TODO <FM: Display, Fn() -> FM>
         fn dbg_error_with_at<F: Fn() -> String>(self, f: F, span: Span) -> Diagnostic;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
 
-    #[cfg(feature = "alloc")]
     impl<T: Debug> DebugExt for T {
-        #[cfg(feature = "alloc")]
-        fn dbg_error(&self) -> DeepDiagnostic {
-            DeepDiagnostic::new_error(format!("{self:?}"))
+        fn dbg_error(&self) -> DeepDiagnostic<impl Display> {
+            let display = DisplayFromFnAndData(|fmt, s| fmt.write_fmt(format_args!("{s:?}")), self);
+            DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
         }
-        fn dbg_error_with<F: Fn() -> String>(self, f: F) -> DeepDiagnostic {
-            let mut s = f();
-            s.push(' ');
-            s.push_str(&format!("{self:?}"));
-            DeepDiagnostic::new_error(s)
+        fn dbg_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display> {
+            let display = DisplayFromFnAndData(
+                |fmt, d| {
+                    d.0().fmt(fmt)?;
+                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                    fmt.write_fmt(format_args!("{:?}", d.1))
+                },
+                (f, self),
+            );
+            DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -508,10 +517,12 @@ pub mod ext_all {
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
-    #[cfg(feature = "alloc")]
-    pub trait ResultErrDebugExt<T> {
-        fn map_error_dbg(self) -> MacroDeepResult<T>;
-        fn map_error_dbg_with<F: Fn() -> String>(self, f: F) -> MacroDeepResult<T>;
+    pub trait ResultErrDebugExt<M: Display, T> {
+        fn map_error_dbg(self) -> MacroDeepResult<T, impl Display>;
+        fn map_error_dbg_with<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+        ) -> MacroDeepResult<T, impl Display>;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn map_error_dbg_at(self, span: Span) -> MacroResult<T>;
@@ -521,17 +532,28 @@ pub mod ext_all {
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
-    #[cfg(feature = "alloc")]
-    impl<T, E: Debug> ResultErrDebugExt<T> for Result<T, E> {
-        fn map_error_dbg(self) -> MacroDeepResult<T> {
-            self.map_err(|e| DeepDiagnostic::new_error(format!("{e:?}")))
-        }
-        fn map_error_dbg_with<F: Fn() -> String>(self, f: F) -> MacroDeepResult<T> {
+    impl<M: Display, T, E: Debug> ResultErrDebugExt<M, T> for Result<T, E> {
+        fn map_error_dbg(self) -> MacroDeepResult<T, impl Display> {
             self.map_err(|e| {
-                let mut s = f();
-                s.push(' ');
-                s.push_str(&format!("{e:?}"));
-                DeepDiagnostic::new_error(s)
+                let display =
+                    DisplayFromFnAndData(|fmt, e| fmt.write_fmt(format_args!("{:?}", e)), e);
+                DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+            })
+        }
+        fn map_error_dbg_with<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+        ) -> MacroDeepResult<T, impl Display> {
+            self.map_err(|e| {
+                let display = DisplayFromFnAndData(
+                    |fmt, (f, e)| {
+                        f().fmt(fmt)?;
+                        Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                        fmt.write_fmt(format_args!("{:?}", e))
+                    },
+                    (f, e),
+                );
+                DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
             })
         }
 
