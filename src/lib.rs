@@ -25,7 +25,6 @@ pub type MacroDeepResult<T, M = String> = Result<T, DeepDiagnostic<M>>;
 #[cfg(not(feature = "alloc"))]
 pub type MacroDeepResult<T, M> = Result<T, DeepDiagnostic<M>>;
 
-// @TODO SEAL!
 #[cfg(feature = "alloc")]
 #[derive(Clone, Debug)]
 pub struct DeepDiagnostic<M: Display = String> {
@@ -102,6 +101,7 @@ impl<M: Display> From<M> for DeepDiagnostic<M> {
 /// Intentionally not public - used to indicate a sealed trait.
 enum SealedTraitFunParam {}
 //--------
+
 /// Similar (but only partially) to [enum_dispatch](https://crates.io/crates/enum_dispatch) and
 /// [enum_delegate](https://crates.io/crates/enum_delegate).
 ///
@@ -187,22 +187,6 @@ pub mod ext_all {
         }
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam) {}
-    }
-
-    pub struct Auto;
-    impl AsRef<usize> for Auto {
-        fn as_ref(&self) -> &usize {
-            todo!()
-        }
-    }
-    impl core::ops::Deref for Auto {
-        type Target = usize;
-        fn deref(&self) -> &Self::Target {
-            todo!()
-        }
-    }
-    fn _auto_convert(a: &Auto) -> usize {
-        **a
     }
 
     #[cfg(feature = "alloc")]
