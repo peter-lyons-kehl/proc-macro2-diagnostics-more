@@ -11,7 +11,7 @@ use core::any::Any;
 
 use core::fmt::{self, Display, Formatter};
 
-#[cfg(feature = "proc-macro2-diagnostics")]
+#[cfg(feature = "proc-macro2")]
 use proc_macro2::Span;
 
 #[cfg(feature = "proc-macro2-diagnostics")]
@@ -91,8 +91,8 @@ impl<M: Display> DeepDiagnostic<M> {
     //
     // pub fn spanned<S: MultiSpan>(self, s: S) -> Diagnostic
     #[cfg(feature = "proc-macro2-diagnostics")]
-    pub fn spanned(self, span: Span) -> Diagnostic {
-        Diagnostic::spanned(span, self.level, self.to_string())
+    pub fn spanned(self, span: Span) -> SpannedDiagnostic<M> {
+        SpannedDiagnostic { deep: self, span }
     }
 
     #[cfg(feature = "alloc")]
@@ -143,6 +143,30 @@ impl<M: Display> From<M> for DeepDiagnostic<M> {
 enum SealedTraitFunParam {}
 //--------
 
+/// Like [proc_macro2_diagnostics::Diagnostic], but the message is not converted to [String], so
+/// that we convert it only at the top function call tree level. To convert use
+/// [SpannedDiagnostic::into_diagnostic].
+#[cfg(feature = "proc-macro2")]
+#[derive(Clone, Debug)]
+pub struct SpannedDiagnostic<M: Display> {
+    deep: DeepDiagnostic<M>,
+    span: Span,
+}
+#[cfg(feature = "proc-macro2")]
+impl<M: Display> SpannedDiagnostic<M> {
+    #[cfg(feature = "proc-macro2-diagnostics")]
+    pub fn into_diagnostic(self) -> Diagnostic {
+        Diagnostic::spanned(self.span, self.deep.level, self.deep.message.to_string())
+    }
+}
+
+#[cfg(feature = "proc-macro2")]
+impl<M: Display> Display for SpannedDiagnostic<M> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.deep.fmt(f)
+    }
+}
+//--------
 /// Similar (but only partially) to [enum_dispatch](https://crates.io/crates/enum_dispatch) and
 /// [enum_delegate](https://crates.io/crates/enum_delegate).
 ///
@@ -222,7 +246,7 @@ pub mod ext {
     #[cfg(feature = "proc-macro2-diagnostics")]
     impl<T, M: Display> MacroDeepResultExt<T> for MacroDeepResult<T, M> {
         fn spanned(self, span: Span) -> MacroResult<T> {
-            self.map_err(|deep_err| deep_err.spanned(span))
+            self.map_err(|deep_err| deep_err.spanned(span).into_diagnostic())
         }
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam) {}
