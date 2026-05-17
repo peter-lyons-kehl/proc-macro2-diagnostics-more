@@ -246,16 +246,10 @@ pub mod ext_all {
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
-    /*struct DisplayFromFn<F: Fn(&mut Formatter) -> FmtResult>(F);
+    struct DisplayFromFn<F: Fn(&mut Formatter) -> FmtResult>(F);
     impl<F: Fn(&mut Formatter) -> FmtResult> Display for DisplayFromFn<F> {
         fn fmt(&self, fmt: &mut Formatter<'_>) -> FmtResult {
             self.0(fmt)
-        }
-    }*/
-    struct DisplayFromFnAndData<F: Fn(&mut Formatter, &D) -> FmtResult, D>(F, D);
-    impl<F: Fn(&mut Formatter, &D) -> FmtResult, D> Display for DisplayFromFnAndData<F, D> {
-        fn fmt(&self, fmt: &mut Formatter<'_>) -> FmtResult {
-            self.0(fmt, &self.1)
         }
     }
     impl<M: Display, T: Into<M>> MsgIntoDisplayExt<M> for T {
@@ -264,15 +258,13 @@ pub mod ext_all {
         }
 
         fn into_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display> {
-            let display = DisplayFromFnAndData(
-                |fmt, d| {
-                    d.0().fmt(fmt)?;
-                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
-                    d.1.fmt(fmt)
-                },
-                (f, self.into()),
-            );
-            DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+            let s = self.into();
+            let display = DisplayFromFn(move |fmt| {
+                f().fmt(fmt)?;
+                Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                s.fmt(fmt)
+            });
+            DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
         }
 
         /// Convenience function: same as into_error().span(span)
@@ -303,6 +295,7 @@ pub mod ext_all {
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn map_error_into_at(self, span: Span) -> MacroResult<T>;
+
         // @TODO FM: Into<impl Display> via a yet-another generic FD
         #[cfg(feature = "proc-macro2-diagnostics")] //@TODO replace -> String with FM: Display and -> FM
         fn map_error_into_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T>;
@@ -319,15 +312,13 @@ pub mod ext_all {
             f: F,
         ) -> MacroDeepResult<T, impl Display> {
             self.map_err(|e| {
-                let display = DisplayFromFnAndData(
-                    |fmt, d| {
-                        d.0().fmt(fmt)?;
-                        Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
-                        d.1.fmt(fmt)
-                    },
-                    (f, e.into()),
-                );
-                DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+                let e = e.into();
+                let display = DisplayFromFn(move |fmt| {
+                    f().fmt(fmt)?;
+                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                    e.fmt(fmt)
+                });
+                DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
             })
         }
 
@@ -335,7 +326,7 @@ pub mod ext_all {
         fn map_error_into_at(self, span: Span) -> MacroResult<T> {
             self.map_err(|e| span.error(e.into().to_string()))
         }
-        #[cfg(feature = "proc-macro2-diagnostics")]
+        #[cfg(feature = "proc-macro2-diagnostics")] //@TODO
         fn map_error_into_with_at<F: Fn() -> String>(self, f: F, span: Span) -> MacroResult<T> {
             self.map_err(|e| {
                 let mut s = f();
@@ -348,30 +339,38 @@ pub mod ext_all {
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
-    pub trait OptionOrBoolExt<T, M: Display> {
-        fn ok_or_error_with<F: Fn() -> M>(self, f: F) -> MacroDeepResult<T, M>;
+    pub trait OptionOrBoolExt<T> {
+        fn ok_or_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<T, FM>;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn ok_or_error_with_at<F: Fn() -> M>(self, f: F, span: Span) -> MacroResult<T>;
+        fn ok_or_error_with_at<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+            span: Span,
+        ) -> MacroResult<T>;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
-    impl<T, M: Display> OptionOrBoolExt<T, M> for Option<T> {
-        fn ok_or_error_with<F: Fn() -> M>(self, f: F) -> MacroDeepResult<T, M> {
+    impl<T> OptionOrBoolExt<T> for Option<T> {
+        fn ok_or_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<T, FM> {
             self.ok_or_else(|| DeepDiagnostic::new_error(f()))
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn ok_or_error_with_at<F: Fn() -> M>(self, f: F, span: Span) -> MacroResult<T> {
+        fn ok_or_error_with_at<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+            span: Span,
+        ) -> MacroResult<T> {
             self.ok_or_else(|| span.error(f().to_string()))
         }
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
-    impl<M: Display> OptionOrBoolExt<(), M> for bool {
-        fn ok_or_error_with<F: Fn() -> M>(self, f: F) -> MacroDeepResult<(), M> {
+    impl OptionOrBoolExt<()> for bool {
+        fn ok_or_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<(), FM> {
             // bool::ok_or_else is unstable: https://github.com/rust-lang/rust/issues/142748
             if self {
                 Ok(())
@@ -381,7 +380,11 @@ pub mod ext_all {
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn ok_or_error_with_at<F: Fn() -> M>(self, f: F, span: Span) -> MacroResult<()> {
+        fn ok_or_error_with_at<FM: Display, F: Fn() -> FM>(
+            self,
+            f: F,
+            span: Span,
+        ) -> MacroResult<()> {
             if self {
                 Ok(())
             } else {
@@ -496,19 +499,16 @@ pub mod ext_all {
 
     impl<T: Debug> DebugExt for T {
         fn dbg_error(&self) -> DeepDiagnostic<impl Display> {
-            let display = DisplayFromFnAndData(|fmt, s| fmt.write_fmt(format_args!("{s:?}")), self);
-            DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+            let display = DisplayFromFn(move |fmt| fmt.write_fmt(format_args!("{self:?}")));
+            DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
         }
         fn dbg_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display> {
-            let display = DisplayFromFnAndData(
-                |fmt, d| {
-                    d.0().fmt(fmt)?;
-                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
-                    fmt.write_fmt(format_args!("{:?}", d.1))
-                },
-                (f, self),
-            );
-            DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+            let display = DisplayFromFn(move |fmt| {
+                f().fmt(fmt)?;
+                Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                fmt.write_fmt(format_args!("{self:?}"))
+            });
+            DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -545,9 +545,8 @@ pub mod ext_all {
     impl<T, E: Debug> ResultErrDebugExt<T> for Result<T, E> {
         fn map_error_dbg(self) -> MacroDeepResult<T, impl Display> {
             self.map_err(|e| {
-                let display =
-                    DisplayFromFnAndData(|fmt, e| fmt.write_fmt(format_args!("{:?}", e)), e);
-                DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+                let display = DisplayFromFn(move |fmt| fmt.write_fmt(format_args!("{e:?}")));
+                DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
             })
         }
         fn map_error_dbg_with<FM: Display, F: Fn() -> FM>(
@@ -555,15 +554,12 @@ pub mod ext_all {
             f: F,
         ) -> MacroDeepResult<T, impl Display> {
             self.map_err(|e| {
-                let display = DisplayFromFnAndData(
-                    |fmt, (f, e)| {
-                        f().fmt(fmt)?;
-                        Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
-                        fmt.write_fmt(format_args!("{:?}", e))
-                    },
-                    (f, e),
-                );
-                DeepDiagnostic::<DisplayFromFnAndData<_, _>>::new_error(display)
+                let display = DisplayFromFn(move |fmt| {
+                    f().fmt(fmt)?;
+                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                    fmt.write_fmt(format_args!("{e:?}"))
+                });
+                DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
             })
         }
 
