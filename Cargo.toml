@@ -1,5 +1,5 @@
 [package]
-name = "proc-macro2-diagnostics-more"
+name = "dis"
 version = "0.0.1"
 
 edition = "2021"
@@ -8,14 +8,14 @@ rust-version = "1.78.0"
 license = "BSD-2-Clause OR Apache-2.0 OR MIT"
 
 authors = ["Peter Lyons Kehl<peter.kehl@gmail.com>"]
-description = "Trait extensions and asserts to use with proc-macro2-diagnostics. no-std and no-alloc: A subset accepts Display (instead of String)."
+description = "Dis(playish): Wrappers, trait extensions and asserts to wrap type(s) implementing Display and an optional extra. Use with proc-macro2-diagnostics. no-std and no-alloc: A subset accepts Display (instead of String)."
 
 categories = ["development-tools", "no-std", "no-std::no-alloc", "rust-patterns"]
 
-keywords = ["error-handling", "error-reporting", "macro", "macros", "panic"]
+keywords = ["display", "error-handling", "string", "wrapper", "extension"]
 
-repository = "https://github.com/peter-lyons-kehl/proc-macro2-diagnostics-more"
-homepage = "https://github.com/peter-lyons-kehl/proc-macro2-diagnostics-more"
+repository = "https://github.com/peter-lyons-kehl/dis"
+homepage = "https://github.com/peter-lyons-kehl/dis"
 
 [dependencies]
 proc-macro2-diagnostics = { version = "0.10.1", optional = true }
@@ -24,10 +24,12 @@ proc-macro2 = {version="1.0.60", features=["span-locations"], optional = true }
 
 [features]
 alloc = []
-proc-macro2-diagnostics = ["proc-macro2", "dep:proc-macro2-diagnostics", "alloc"]
+proc-macro2 = ["dep:proc-macro2", "alloc"]
+proc-macro2-diagnostics = ["proc-macro2", "dep:proc-macro2-diagnostics"]
 
-#default = ["alloc", "proc-macro2-diagnostics"]
 #default = ["alloc"]
+#default = ["proc-macro2"]
+#default = ["proc-macro2-diagnostics"]
 
 [package.metadata.docs.rs]
 default-target = "x86_64-unknown-linux-gnu"

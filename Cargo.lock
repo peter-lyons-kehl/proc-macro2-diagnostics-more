@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "dis"
+version = "0.0.1"
+dependencies = [
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -22,14 +30,6 @@ dependencies = [
  "syn",
  "version_check",
  "yansi",
-]
-
-[[package]]
-name = "proc-macro2-diagnostics-more"
-version = "0.0.1"
-dependencies = [
- "proc-macro2",
- "proc-macro2-diagnostics",
 ]
 
 [[package]]

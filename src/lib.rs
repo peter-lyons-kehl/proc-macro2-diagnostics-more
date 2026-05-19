@@ -11,133 +11,127 @@ use core::any::Any;
 
 use core::fmt::{self, Display, Formatter};
 
-#[cfg(feature = "proc-macro2")]
-use proc_macro2::Span;
+// @TODO
+//
+//#[cfg(feature = "proc-macro2")]
+//
+//use proc_macro2::Span;
 
 #[cfg(feature = "proc-macro2-diagnostics")]
 use proc_macro2_diagnostics::{Diagnostic as PmDiagnostic, Level};
 
+#[cfg(not(feature = "alloc"))]
+pub type DisplayishResult<T, D, EX = ()> = Result<T, Displayish<D, EX>>;
+
+#[cfg(feature = "alloc")]
+pub type DisplayishResult<T, D = String, EX = ()> = Result<T, Displayish<D, EX>>;
+
+//-----
+#[cfg(feature = "proc-macro2-diagnostics")]
+pub type MacroDeepDiagnostic<D = String> = Displayish<D, Level>;
+
+/// Like [proc_macro2_diagnostics::Diagnostic], but its [Displayish::display] is NOT converted to
+/// [String], so that we convert it only at the top function call tree level. To convert use
+/// [SpannedDiagnostic::into_diagnostic]. <--- @TODO this docs
+#[cfg(feature = "proc-macro2-diagnostics")]
+pub type MacroSpannedDiagnostic<D = String> = Displayish<D, (Level, Span)>;
+
+#[cfg(feature = "proc-macro2-diagnostics")]
+pub type MacroDeepResult<T, D = String> = Result<T, MacroDeepDiagnostic<D>>;
+
 #[cfg(feature = "proc-macro2-diagnostics")]
 pub type MacroResult<T> = Result<T, PmDiagnostic>;
-
-#[cfg(feature = "alloc")]
-pub type MacroDeepResult<T, M = String> = Result<T, DeepDiagnostic<M>>;
-
-#[cfg(not(feature = "alloc"))]
-pub type MacroDeepResult<T, M> = Result<T, DeepDiagnostic<M>>;
+//-----
 
 /*#[cfg(feature = "proc-macro2")]
-pub type MacroSpannedResult<T, M> = Result<T, SpannedDiagnostic<M>>;*/
+pub type MacroSpannedResult<T, D> = Result<T, SpannedDiagnostic<D>>;*/
 
 #[cfg(feature = "alloc")]
 #[derive(Clone, Debug)]
-pub struct DeepDiagnostic<M: Display = String> {
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    level: Level,
-
-    message: M,
+pub struct Displayish<D: Display = String, EX = ()> {
+    display: D,
+    extra: EX,
 }
 #[cfg(not(feature = "alloc"))]
 #[derive(Clone, Debug)]
-pub struct DeepDiagnostic<M: Display> {
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    level: Level,
-
-    message: M,
+pub struct Displayish<D: Display, EX = ()> {
+    display: D,
+    extra: EX,
 }
-impl<M: Display> DeepDiagnostic<M> {
-    pub fn new_error<T: Into<M>>(message: T) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: Level::Error,
-
-            message: message.into(),
-        }
+impl<D: Display, EX> Displayish<D, EX> {
+    pub const fn new_from_pair(display: D, extra: EX) -> Self {
+        Self { display, extra }
     }
-    /*pub fn new_warning<T: Into<M>>(message: T) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: Level::Warning,
-
-            message: message.into(),
-        }
-    }*/
-    /*pub fn new_note<T: Into<M>>(message: T) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: Level::Note,
-
-            message: message.into(),
-        }
-    }*/
-    /*pub fn new_help<T: Into<M>>(message: T) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: Level::Help,
-
-            message: message.into(),
-        }
-    }*/
-
-    pub fn into_msg(self) -> M {
-        self.message
+    pub fn new_from_into_pair(display: impl Into<D>, extra: impl Into<EX>) -> Self {
+        Self::new_from_pair(display.into(), extra.into())
     }
-    pub fn msg(&self) -> &M {
-        &self.message
+    pub fn into_display(self) -> D {
+        self.display
     }
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    pub fn level(&self) -> Level {
-        self.level
+    pub fn display(&self) -> &D {
+        &self.display
     }
-
-    // @TODO if implemented in proc_macro2_diagnostics, make it accept MultiSpan:
-    //
-    // pub fn spanned<S: MultiSpan>(self, s: S) -> Diagnostic
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    pub fn spanned(self, span: Span) -> SpannedDiagnostic<M> {
-        SpannedDiagnostic { deep: self, span }
+    pub fn into_extra(self) -> EX {
+        self.extra
+    }
+    pub fn extra(&self) -> &EX {
+        &self.extra
+    }
+    pub fn into_pair(self) -> (D, EX) {
+        (self.display, self.extra)
     }
 
     #[cfg(feature = "alloc")]
-    pub fn to_string_based(self) -> DeepDiagnostic {
-        DeepDiagnostic {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: self.level,
-
-            message: self.message.to_string(),
-        }
+    pub fn to_string_based(self) -> Displayish<String, EX> {
+        let display = self.display.to_string();
+        let extra = self.extra;
+        Displayish { display, extra }
     }
 }
-impl<M: Display> Display for DeepDiagnostic<M> {
+impl<D: Display> Displayish<D, ()> {
+    pub fn new_from_display(display: impl Into<D>) -> Self {
+        let display = display.into();
+        let extra = ();
+        Self { display, extra }
+    }
+}
+impl<D: Display, EX> Display for Displayish<D, EX> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.message.fmt(f)
+        self.display.fmt(f)
     }
 }
 #[cfg(feature = "alloc")]
-impl DeepDiagnostic {
+impl Displayish {
     pub fn to_string_move(self) -> String {
-        self.message
+        self.display
     }
 }
 #[cfg(feature = "alloc")]
-impl<M: Display + 'static> DeepDiagnostic<M> {
+impl<D: Display + 'static> Displayish<D> {
     pub fn to_string_move_maybe(mut self) -> String {
         let self_mut = &mut self as &mut dyn Any;
-        match self_mut.downcast_mut::<DeepDiagnostic<String>>() {
-            Some(as_string_based) => core::mem::take(&mut as_string_based.message),
+        match self_mut.downcast_mut::<Displayish<String>>() {
+            Some(as_string_based) => core::mem::take(&mut as_string_based.display),
             None => self.to_string(),
         }
     }
 }
-impl<M: Display> From<M> for DeepDiagnostic<M> {
+impl<D: Display> From<D> for Displayish<D, ()> {
+    //@TODO DOC old:
     /// Move-and-construct/convert. If using `proc-macro2-diagnostics`, then [DeepDiagnostic::level]
     /// will be set to [Level::Error].
-    fn from(message: M) -> Self {
-        Self {
-            #[cfg(feature = "proc-macro2-diagnostics")]
-            level: Level::Error,
+    fn from(display: D) -> Self {
+        let extra = ();
+        Self { display, extra }
+    }
+}
 
-            message,
+#[cfg(feature = "proc-macro2-diagnostics")]
+impl<D: Display> MacroDeepDiagnostic<D> {
+    pub fn spanned(self, span: Span) -> MacroSpannedDiagnostic<D> {
+        MacroSpannedDiagnostic {
+            display: self.display,
+            extra: (self.extra, span),
         }
     }
 }
@@ -146,30 +140,13 @@ impl<M: Display> From<M> for DeepDiagnostic<M> {
 enum SealedTraitFunParam {}
 //--------
 
-/// Like [proc_macro2_diagnostics::Diagnostic], but the message is not converted to [String], so
-/// that we convert it only at the top function call tree level. To convert use
-/// [SpannedDiagnostic::into_diagnostic].
-#[cfg(feature = "proc-macro2")]
-#[derive(Clone, Debug)]
-// @TODO Consider default type String
-pub struct SpannedDiagnostic<M: Display> {
-    deep: DeepDiagnostic<M>,
-    span: Span,
-}
-#[cfg(feature = "proc-macro2")]
-impl<M: Display> SpannedDiagnostic<M> {
-    #[cfg(feature = "proc-macro2-diagnostics")]
+#[cfg(feature = "proc-macro2-diagnostics")]
+impl<D: Display> MacroSpannedDiagnostic<D> {
     pub fn into_diagnostic(self) -> PmDiagnostic {
-        PmDiagnostic::spanned(self.span, self.deep.level, self.deep.message.to_string())
+        PmDiagnostic::spanned(self.extra.1, self.extra.0, self.display.to_string())
     }
 }
 
-#[cfg(feature = "proc-macro2")]
-impl<M: Display> Display for SpannedDiagnostic<M> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.deep.fmt(f)
-    }
-}
 //--------
 /// Similar (but only partially) to [enum_dispatch](https://crates.io/crates/enum_dispatch) and
 /// [enum_delegate](https://crates.io/crates/enum_delegate).
@@ -223,12 +200,12 @@ pub mod by_dyn {
 
 pub mod ext {
     #[cfg(feature = "proc-macro2-diagnostics")]
-    use crate::MacroResult;
+    use crate::{MacroDeepResult, MacroResult};
 
-    use crate::{DeepDiagnostic, MacroDeepResult, SealedTraitFunParam};
+    use crate::{Displayish, DisplayishResult, SealedTraitFunParam};
 
     #[cfg(feature = "alloc")]
-    use alloc::{format, string::ToString};
+    use alloc::{format, string::String, string::ToString};
 
     use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
@@ -248,7 +225,7 @@ pub mod ext {
         fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "proc-macro2-diagnostics")]
-    impl<T, M: Display> MacroDeepResultExt<T> for MacroDeepResult<T, M> {
+    impl<T, D: Display> MacroDeepResultExt<T> for MacroDeepResult<T, D> {
         fn spanned(self, span: Span) -> MacroResult<T> {
             self.map_err(|deep_err| deep_err.spanned(span).into_diagnostic())
         }
@@ -256,21 +233,23 @@ pub mod ext {
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
-    pub trait MsgIntoDisplayExt<M: Display>: Into<M> {
-        fn into_error(self) -> DeepDiagnostic<M>;
+    pub trait ContentIntoDisplayExt<D: Display>: Into<D> {
+        fn into_dis(self) -> Displayish<D>;
 
         /// Param `f` is a closure/function that returns an implementation of [Display]. This method
-        /// returns [DeepDiagnostic] with a message
+        /// returns [DeepDiagnostic] with a [Displayish::display]
         /// - starting with that [Display] returned from `f()`, then
         /// - a space appended, and
         /// - ONLY THEN [Display] generated by `self.into()`.
-        fn into_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display>;
+        fn into_dis_with<FD: Display, F: Fn() -> FD>(self, f: F) -> Displayish<impl Display>;
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn into_error_at(self, span: Span) -> PmDiagnostic;
+        fn into_dis_and<EX>(self, extra: EX) -> Displayish<D, EX>;
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn into_error_with_at<FM: Display, F: Fn() -> FM>(self, f: F, span: Span) -> PmDiagnostic;
+        fn into_dis_with_and<FD: Display, F: Fn() -> FD, EX>(
+            self,
+            f: F,
+            extra: EX,
+        ) -> Displayish<impl Display, EX>;
 
         // Sealing is not really necessary, because we have a blanket impl that covers any and
         // all eligible types, so no other types can implement this trait.
@@ -285,92 +264,95 @@ pub mod ext {
             self.0(fmt)
         }
     }
-    impl<M: Display, T: Into<M>> MsgIntoDisplayExt<M> for T {
-        fn into_error(self) -> DeepDiagnostic<M> {
-            DeepDiagnostic::new_error(self.into())
+    impl<D: Display, T: Into<D>> ContentIntoDisplayExt<D> for T {
+        fn into_dis(self) -> Displayish<D> {
+            Displayish::new_from_display(self.into())
         }
 
-        fn into_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display> {
+        fn into_dis_with<FD: Display, F: Fn() -> FD>(self, f: F) -> Displayish<impl Display> {
             let s = self.into();
             let display = DisplayFromFn(move |fmt| {
                 f().fmt(fmt)?;
                 Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
                 s.fmt(fmt)
             });
-            DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
+            Displayish::<DisplayFromFn<_>>::new_from_display(display)
         }
 
-        /// Convenience function: same as into_error().span(span)
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn into_error_at(self, span: Span) -> PmDiagnostic {
-            let m = self.into();
-            span.error(m.to_string())
+        fn into_dis_and<EX>(self, extra: EX) -> Displayish<D, EX> {
+            Displayish::new_from_pair(self.into(), extra)
         }
-        /// Convenience function: same as into_error_with(f).span(span)
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn into_error_with_at<FM: Display, F: Fn() -> FM>(self, f: F, span: Span) -> PmDiagnostic {
-            let mut s = f().to_string();
-            s.push(' ');
-            s.push_str(&self.into().to_string());
-            span.error(s)
+        fn into_dis_with_and<FD: Display, F: Fn() -> FD, EX>(
+            self,
+            f: F,
+            extra: EX,
+        ) -> Displayish<impl Display, EX> {
+            let s = self.into();
+            let display = DisplayFromFn(move |fmt| {
+                f().fmt(fmt)?;
+                Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                s.fmt(fmt)
+            });
+            Displayish::<DisplayFromFn<_>, _>::new_from_pair(display, extra)
         }
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
 
-    pub trait ResultErrIntoDisplayExt<M: Display, T> {
-        fn map_error_into(self) -> MacroDeepResult<T, M>;
-        fn map_error_into_with<FM: Display, F: Fn() -> FM>(
+    pub trait ResultErrIntoDisplayExt<D: Display, T> {
+        fn map_error_into(self) -> DisplayishResult<T, D>;
+        fn map_error_into_with<FD: Display, F: Fn() -> FD>(
             self,
             f: F,
-        ) -> MacroDeepResult<T, impl Display>;
+        ) -> DisplayishResult<T, impl Display>;
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_into_at(self, span: Span) -> MacroResult<T>;
+        fn map_error_into_and<EX>(self, extra: EX) -> DisplayishResult<T, impl Display, EX>;
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_into_with_at<FM: Display, F: Fn() -> FM>(
+        fn map_error_into_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<T>;
+            extra: EX,
+        ) -> DisplayishResult<T, impl Display, EX>;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
-    impl<M: Display, T, E: Into<M>> ResultErrIntoDisplayExt<M, T> for Result<T, E> {
-        fn map_error_into(self) -> MacroDeepResult<T, M> {
-            self.map_err(|e| DeepDiagnostic::new_error(e))
+    impl<D: Display, T, ERR: Into<D>> ResultErrIntoDisplayExt<D, T> for Result<T, ERR> {
+        fn map_error_into(self) -> DisplayishResult<T, D> {
+            self.map_err(|err| Displayish::new_from_display(err))
         }
-        fn map_error_into_with<FM: Display, F: Fn() -> FM>(
+        fn map_error_into_with<FD: Display, F: Fn() -> FD>(
             self,
             f: F,
-        ) -> MacroDeepResult<T, impl Display> {
-            self.map_err(|e| {
-                let e = e.into();
+        ) -> DisplayishResult<T, impl Display> {
+            self.map_err(|err| {
+                let err = err.into();
                 let display = DisplayFromFn(move |fmt| {
                     f().fmt(fmt)?;
                     Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
-                    e.fmt(fmt)
+                    err.fmt(fmt)
                 });
-                DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
+                Displayish::<DisplayFromFn<_>>::new_from_display(display)
             })
         }
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_into_at(self, span: Span) -> MacroResult<T> {
-            self.map_err(|e| span.error(e.into().to_string()))
+        fn map_error_into_and<EX>(self, extra: EX) -> DisplayishResult<T, impl Display, EX> {
+            self.map_err(|err| Displayish::new_from_into_pair(err, extra))
         }
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_into_with_at<FM: Display, F: Fn() -> FM>(
+        fn map_error_into_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<T> {
-            self.map_err(|e| {
-                let s = format!("{} {}", f(), e.into());
-                span.error(s)
+            extra: EX,
+        ) -> DisplayishResult<T, impl Display, EX> {
+            self.map_err(|err| {
+                let err = err.into();
+                let display = DisplayFromFn(move |fmt| {
+                    f().fmt(fmt)?;
+                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                    err.fmt(fmt)
+                });
+                Displayish::new_from_pair(display, extra)
             })
         }
         #[allow(private_interfaces)]
@@ -378,55 +360,52 @@ pub mod ext {
     }
 
     pub trait OptionOrBoolExt<T> {
-        fn ok_or_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<T, FM>;
+        fn ok_or_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T, FD>;
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn ok_or_error_with_at<FM: Display, F: Fn() -> FM>(
+        fn ok_or_error_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<T>;
+            extra: EX,
+        ) -> DisplayishResult<T, FD, EX>;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
     impl<T> OptionOrBoolExt<T> for Option<T> {
-        fn ok_or_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<T, FM> {
-            self.ok_or_else(|| DeepDiagnostic::new_error(f()))
+        fn ok_or_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T, FD> {
+            self.ok_or_else(|| Displayish::new_from_display(f()))
         }
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn ok_or_error_with_at<FM: Display, F: Fn() -> FM>(
+        fn ok_or_error_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<T> {
-            self.ok_or_else(|| span.error(f().to_string()))
+            extra: EX,
+        ) -> DisplayishResult<T, FD, EX> {
+            self.ok_or_else(|| Displayish::new_from_pair(f(), extra))
         }
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
     impl OptionOrBoolExt<()> for bool {
-        fn ok_or_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<(), FM> {
+        fn ok_or_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<(), FD> {
             // bool::ok_or_else is unstable: https://github.com/rust-lang/rust/issues/142748
             if self {
                 Ok(())
             } else {
-                Err(DeepDiagnostic::new_error(f()))
+                Err(Displayish::new_from_display(f()))
             }
         }
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn ok_or_error_with_at<FM: Display, F: Fn() -> FM>(
+        fn ok_or_error_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<()> {
+            extra: EX,
+        ) -> DisplayishResult<(), FD, EX> {
             if self {
                 Ok(())
             } else {
-                Err(span.error(f().to_string()))
+                Err(Displayish::new_from_pair(f(), extra))
             }
         }
 
@@ -436,25 +415,25 @@ pub mod ext {
 
     #[cfg(feature = "alloc")]
     pub trait ToStringExt: ToString {
-        fn to_error(&self) -> DeepDiagnostic;
-        fn to_error_with<FM: Display, F: Fn() -> FM>(&self, f: F) -> DeepDiagnostic;
+        fn to_error(&self) -> Displayish;
+        fn to_error_with<FD: Display, F: Fn() -> FD>(&self, f: F) -> Displayish;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn to_error_at(&self, span: Span) -> PmDiagnostic;
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn to_error_with_at<FM: Display, F: Fn() -> FM>(&self, f: F, span: Span) -> PmDiagnostic;
+        fn to_error_with_at<FD: Display, F: Fn() -> FD>(&self, f: F, span: Span) -> PmDiagnostic;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
     impl<T: ToString> ToStringExt for T {
-        fn to_error(&self) -> DeepDiagnostic {
-            DeepDiagnostic::new_error(self.to_string())
+        fn to_error(&self) -> Displayish {
+            Displayish::new_from_display(self.to_string())
         }
-        fn to_error_with<FM: Display, F: Fn() -> FM>(&self, f: F) -> DeepDiagnostic {
+        fn to_error_with<FD: Display, F: Fn() -> FD>(&self, f: F) -> Displayish {
             let s = format!("{} {}", f(), self.to_string());
-            DeepDiagnostic::new_error(s)
+            Displayish::new_from_display(s)
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -462,7 +441,7 @@ pub mod ext {
             span.error(self.to_string())
         }
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn to_error_with_at<FM: Display, F: Fn() -> FM>(&self, f: F, span: Span) -> PmDiagnostic {
+        fn to_error_with_at<FD: Display, F: Fn() -> FD>(&self, f: F, span: Span) -> PmDiagnostic {
             let s = format!("{} {}", f(), self.to_string());
             span.error(s)
         }
@@ -473,13 +452,13 @@ pub mod ext {
 
     #[cfg(feature = "alloc")]
     pub trait ResultErrToDisplayExt<T> {
-        fn map_error_to(self) -> MacroDeepResult<T>;
-        fn map_error_to_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<T>;
+        fn map_error_to(self) -> DisplayishResult<T>;
+        fn map_error_to_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T>;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn map_error_to_at(self, span: Span) -> MacroResult<T>;
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_to_with_at<FM: Display, F: Fn() -> FM>(
+        fn map_error_to_with_at<FD: Display, F: Fn() -> FD>(
             self,
             f: F,
             span: Span,
@@ -489,14 +468,14 @@ pub mod ext {
         fn _seal(&self, _: SealedTraitFunParam);
     }
     #[cfg(feature = "alloc")]
-    impl<T, E: ToString> ResultErrToDisplayExt<T> for Result<T, E> {
-        fn map_error_to(self) -> MacroDeepResult<T> {
-            self.map_err(|e| DeepDiagnostic::new_error(e.to_string()))
+    impl<T, ERR: ToString> ResultErrToDisplayExt<T> for Result<T, ERR> {
+        fn map_error_to(self) -> DisplayishResult<T> {
+            self.map_err(|e| Displayish::new_from_display(e.to_string()))
         }
-        fn map_error_to_with<FM: Display, F: Fn() -> FM>(self, f: F) -> MacroDeepResult<T> {
+        fn map_error_to_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T> {
             self.map_err(|e| {
                 let s = format!("{} {}", f(), e.to_string());
-                DeepDiagnostic::new_error(s)
+                Displayish::new_from_display(s)
             })
         }
 
@@ -505,7 +484,7 @@ pub mod ext {
             self.map_err(|e| span.error(e.to_string()))
         }
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_to_with_at<FM: Display, F: Fn() -> FM>(
+        fn map_error_to_with_at<FD: Display, F: Fn() -> FD>(
             self,
             f: F,
             span: Span,
@@ -521,32 +500,32 @@ pub mod ext {
     }
 
     pub trait DebugExt: Debug {
-        fn dbg_error(&self) -> DeepDiagnostic<impl Display>;
+        fn dbg_error(&self) -> Displayish<impl Display>;
 
-        fn dbg_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display>;
+        fn dbg_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> Displayish<impl Display>;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
         fn dbg_error_at(&self, span: Span) -> PmDiagnostic;
 
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn dbg_error_with_at<FM: Display, F: Fn() -> FM>(self, f: F, span: Span) -> PmDiagnostic;
+        fn dbg_error_with_at<FD: Display, F: Fn() -> FD>(self, f: F, span: Span) -> PmDiagnostic;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
 
     impl<T: Debug> DebugExt for T {
-        fn dbg_error(&self) -> DeepDiagnostic<impl Display> {
+        fn dbg_error(&self) -> Displayish<impl Display> {
             let display = DisplayFromFn(move |fmt| fmt.write_fmt(format_args!("{self:?}")));
-            DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
+            Displayish::<DisplayFromFn<_>>::new_from_display(display)
         }
-        fn dbg_error_with<FM: Display, F: Fn() -> FM>(self, f: F) -> DeepDiagnostic<impl Display> {
+        fn dbg_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> Displayish<impl Display> {
             let display = DisplayFromFn(move |fmt| {
                 f().fmt(fmt)?;
                 Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
                 fmt.write_fmt(format_args!("{self:?}"))
             });
-            DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
+            Displayish::<DisplayFromFn<_>>::new_from_display(display)
         }
 
         #[cfg(feature = "proc-macro2-diagnostics")]
@@ -554,7 +533,7 @@ pub mod ext {
             span.error(format!("{self:?}"))
         }
         #[cfg(feature = "proc-macro2-diagnostics")]
-        fn dbg_error_with_at<FM: Display, F: Fn() -> FM>(self, f: F, span: Span) -> PmDiagnostic {
+        fn dbg_error_with_at<FD: Display, F: Fn() -> FD>(self, f: F, span: Span) -> PmDiagnostic {
             let s = format!("{} {:?}", f(), self);
             span.error(s)
         }
@@ -564,58 +543,61 @@ pub mod ext {
     }
 
     pub trait ResultErrDebugExt<T> {
-        fn map_error_dbg(self) -> MacroDeepResult<T, impl Display>;
-        fn map_error_dbg_with<FM: Display, F: Fn() -> FM>(
+        fn map_error_dbg(self) -> DisplayishResult<T, impl Display>;
+        fn map_error_dbg_with<FD: Display, F: Fn() -> FD>(
             self,
             f: F,
-        ) -> MacroDeepResult<T, impl Display>;
+        ) -> DisplayishResult<T, impl Display>;
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_dbg_at(self, span: Span) -> MacroResult<T>;
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_dbg_with_at<FM: Display, F: Fn() -> FM>(
+        fn map_error_dbg_and<EX>(self, extra: EX) -> DisplayishResult<T, impl Display, EX>;
+        fn map_error_dbg_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<T>;
+            extra: EX,
+        ) -> DisplayishResult<T, impl Display, EX>;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam);
     }
-    impl<T, E: Debug> ResultErrDebugExt<T> for Result<T, E> {
-        fn map_error_dbg(self) -> MacroDeepResult<T, impl Display> {
+    impl<T, ERR: Debug> ResultErrDebugExt<T> for Result<T, ERR> {
+        fn map_error_dbg(self) -> DisplayishResult<T, impl Display> {
             self.map_err(|e| {
                 let display = DisplayFromFn(move |fmt| fmt.write_fmt(format_args!("{e:?}")));
-                DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
+                Displayish::<DisplayFromFn<_>>::new_from_display(display)
             })
         }
-        fn map_error_dbg_with<FM: Display, F: Fn() -> FM>(
+        fn map_error_dbg_with<FD: Display, F: Fn() -> FD>(
             self,
             f: F,
-        ) -> MacroDeepResult<T, impl Display> {
+        ) -> DisplayishResult<T, impl Display> {
             self.map_err(|e| {
                 let display = DisplayFromFn(move |fmt| {
                     f().fmt(fmt)?;
                     Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
                     fmt.write_fmt(format_args!("{e:?}"))
                 });
-                DeepDiagnostic::<DisplayFromFn<_>>::new_error(display)
+                Displayish::<DisplayFromFn<_>>::new_from_display(display)
             })
         }
 
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_dbg_at(self, span: Span) -> MacroResult<T> {
-            self.map_err(|e| span.error(format!("{e:?}")))
+        fn map_error_dbg_and<EX>(self, extra: EX) -> DisplayishResult<T, impl Display, EX> {
+            self.map_err(|e| {
+                let display = DisplayFromFn(move |fmt| fmt.write_fmt(format_args!("{e:?}")));
+                Displayish::<DisplayFromFn<_>, _>::new_from_pair(display, extra)
+            })
         }
-        #[cfg(feature = "proc-macro2-diagnostics")]
-        fn map_error_dbg_with_at<FM: Display, F: Fn() -> FM>(
+        fn map_error_dbg_with_and<FD: Display, F: Fn() -> FD, EX>(
             self,
             f: F,
-            span: Span,
-        ) -> MacroResult<T> {
+            extra: EX,
+        ) -> DisplayishResult<T, impl Display, EX> {
             self.map_err(|e| {
-                let s = format!("{} {:?}", f(), e);
-                span.error(s)
+                let display = DisplayFromFn(move |fmt| {
+                    f().fmt(fmt)?;
+                    Display::fmt(&' ', fmt)?; // ' '.fmt(fmt) is ambiguous
+                    fmt.write_fmt(format_args!("{e:?}"))
+                });
+                Displayish::<DisplayFromFn<_>, _>::new_from_pair(display, extra)
             })
         }
 
@@ -624,15 +606,15 @@ pub mod ext {
     }
 
     #[cfg(feature = "alloc")]
-    pub trait MacroDeepResultDisplayToString<T> {
-        fn to_string_based(self) -> MacroDeepResult<T>;
+    pub trait ResultDisplayToString<T, EX> {
+        fn to_string_based(self) -> DisplayishResult<T, String, EX>;
 
         #[allow(private_interfaces)]
         fn _seal(&self, _: SealedTraitFunParam) {}
     }
     #[cfg(feature = "alloc")]
-    impl<T, M: Display> MacroDeepResultDisplayToString<T> for MacroDeepResult<T, M> {
-        fn to_string_based(self) -> MacroDeepResult<T> {
+    impl<T, D: Display, EX> ResultDisplayToString<T, EX> for DisplayishResult<T, D, EX> {
+        fn to_string_based(self) -> DisplayishResult<T, String, EX> {
             self.map_err(|e| e.to_string_based())
         }
 
@@ -643,29 +625,20 @@ pub mod ext {
 
 pub mod assert {
     use crate::ext::OptionOrBoolExt;
-
-    use crate::MacroDeepResult;
-
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    use crate::MacroResult;
-
+    use crate::DisplayishResult;
     use core::fmt::Display;
 
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    use proc_macro2::Span;
-
-    pub fn true_or_error_with<FM: Display, F: Fn() -> FM>(
+    pub fn true_or_error_with<FD: Display, F: Fn() -> FD>(
         b: bool,
         f: F,
-    ) -> MacroDeepResult<(), FM> {
+    ) -> DisplayishResult<(), FD> {
         b.ok_or_error_with(f)
     }
-    #[cfg(feature = "proc-macro2-diagnostics")]
-    pub fn true_or_error_with_at<FM: Display, F: Fn() -> FM>(
+    pub fn true_or_error_with_at<FD: Display, F: Fn() -> FD, EX>(
         b: bool,
         f: F,
-        span: Span,
-    ) -> MacroResult<()> {
-        b.ok_or_error_with_at(f, span)
+        extra: EX,
+    ) -> DisplayishResult<(), FD, EX> {
+        b.ok_or_error_with_and(f, extra)
     }
 }
