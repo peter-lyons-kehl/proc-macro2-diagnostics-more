@@ -1,15 +1,28 @@
-use crate::{DisplayishResult, LevelLike, SealedTraitFunParam};
+use crate::{Displayish, DisplayishResult, Seal};
 use core::fmt::{Debug, Display};
 
-#[cfg(feature = "proc-macro2-diagnostics")]
-use crate::{MacroDeepResult, MacroDiagnosticResult};
-
-#[cfg(feature = "proc-macro2-diagnostics")]
+use crate::{MacroDeepDiagnostic, MacroDeepResult, MacroDiagnosticResult, LEVEL_LIKE};
 use proc_macro2::Span;
 
 #[cfg(feature = "proc-macro2-diagnostics")]
 use proc_macro2_diagnostics::{Diagnostic as PmDiagnostic, SpanDiagnosticExt as _};
 
+//------
+
+pub trait AsMacroDeepDiagnostic<D: Display = String> {
+    fn as_macro_deep_diagnostic(self) -> MacroDeepDiagnostic<D>;
+
+    #[allow(private_interfaces)]
+    fn _seal(&self, _: Seal);
+}
+impl<D: Display> AsMacroDeepDiagnostic<D> for Displayish<D> {
+    fn as_macro_deep_diagnostic(self) -> MacroDeepDiagnostic<D> {
+        self.and_extra(LEVEL_LIKE)
+    }
+
+    #[allow(private_interfaces)]
+    fn _seal(&self, _: Seal) {}
+}
 //------
 
 pub trait DebugExt: Debug {
@@ -18,7 +31,7 @@ pub trait DebugExt: Debug {
     fn dbg_error_with_at<FD: Display, F: Fn() -> FD>(self, f: F, span: Span) -> PmDiagnostic;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<T: Debug> DebugExt for T {
     fn dbg_error_at(&self, span: Span) -> PmDiagnostic {
@@ -30,19 +43,19 @@ impl<T: Debug> DebugExt for T {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 //------
 
 pub trait AsDeepMacroResult<T, D: Display> {
     #[allow(private_interfaces)]
-    fn as_error(self) -> MacroDeepResult<T, D>;
+    fn map_macro_err(self) -> MacroDeepResult<T, D>;
 }
 
 impl<T, D: Display> AsDeepMacroResult<T, D> for DisplayishResult<T, D> {
     #[allow(private_interfaces)]
-    fn as_error(self) -> MacroDeepResult<T, D> {
-        self.map_err(|err| err.and_extra(LevelLike))
+    fn map_macro_err(self) -> MacroDeepResult<T, D> {
+        self.map_err(|err| err.and_extra(LEVEL_LIKE))
     }
 }
 //------
@@ -52,7 +65,7 @@ pub trait ToStringExt: ToString {
     fn to_error_with_at<FD: Display, F: Fn() -> FD>(&self, f: F, span: Span) -> PmDiagnostic;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<T: ToString> ToStringExt for T {
     fn to_error_at(&self, span: Span) -> PmDiagnostic {
@@ -63,7 +76,7 @@ impl<T: ToString> ToStringExt for T {
         span.error(s)
     }
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 //------
 pub trait ResultErrToDisplayExt<T> {
@@ -75,7 +88,7 @@ pub trait ResultErrToDisplayExt<T> {
     ) -> MacroDiagnosticResult<T>;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<T, ERR: ToString> ResultErrToDisplayExt<T> for Result<T, ERR> {
     fn map_error_to_at(self, span: Span) -> MacroDiagnosticResult<T> {
@@ -94,7 +107,7 @@ impl<T, ERR: ToString> ResultErrToDisplayExt<T> for Result<T, ERR> {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 
 //------
@@ -106,14 +119,14 @@ pub trait MacroDeepResultExt<T> {
     fn spanned(self, span: Span) -> MacroDiagnosticResult<T>;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<T, D: Display> MacroDeepResultExt<T> for MacroDeepResult<T, D> {
     fn spanned(self, span: Span) -> MacroDiagnosticResult<T> {
         self.map_err(|deep_err| deep_err.spanned(span).into_diagnostic())
     }
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 //------
 

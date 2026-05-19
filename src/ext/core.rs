@@ -1,4 +1,4 @@
-use crate::{Displayish, DisplayishResult, SealedTraitFunParam};
+use crate::{Displayish, DisplayishResult, Seal};
 
 use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
 
@@ -24,7 +24,7 @@ pub trait ContentIntoDisplayExt<D: Display>: Into<D> {
     // Sealing is not really necessary, because we have a blanket impl that covers any and
     // all eligible types, so no other types can implement this trait.
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 struct DisplayFromFn<F>(F)
 where
@@ -67,7 +67,7 @@ impl<D: Display, T: Into<D>> ContentIntoDisplayExt<D> for T {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 
 pub trait ResultErrIntoDisplayExt<D: Display, T> {
@@ -86,7 +86,7 @@ pub trait ResultErrIntoDisplayExt<D: Display, T> {
     ) -> DisplayishResult<T, impl Display, EX>;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<D: Display, T, ERR: Into<D>> ResultErrIntoDisplayExt<D, T> for Result<T, ERR> {
     fn map_error_into(self) -> DisplayishResult<T, D> {
@@ -126,7 +126,7 @@ impl<D: Display, T, ERR: Into<D>> ResultErrIntoDisplayExt<D, T> for Result<T, ER
         })
     }
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 
 pub trait OptionOrBoolExt<T> {
@@ -139,7 +139,7 @@ pub trait OptionOrBoolExt<T> {
     ) -> DisplayishResult<T, FD, EX>;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<T> OptionOrBoolExt<T> for Option<T> {
     fn ok_or_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T, FD> {
@@ -155,7 +155,7 @@ impl<T> OptionOrBoolExt<T> for Option<T> {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 impl OptionOrBoolExt<()> for bool {
     fn ok_or_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<(), FD> {
@@ -180,7 +180,7 @@ impl OptionOrBoolExt<()> for bool {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 
 pub trait DebugExt: Debug {
@@ -189,7 +189,7 @@ pub trait DebugExt: Debug {
     fn dbg_error_with<FD: Display, F: Fn() -> FD>(self, f: F) -> Displayish<impl Display>;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 
 impl<T: Debug> DebugExt for T {
@@ -207,7 +207,7 @@ impl<T: Debug> DebugExt for T {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }
 
 pub trait ResultErrDebugExt<T> {
@@ -225,7 +225,7 @@ pub trait ResultErrDebugExt<T> {
     ) -> DisplayishResult<T, impl Display, EX>;
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam);
+    fn _seal(&self, _: Seal);
 }
 impl<T, ERR: Debug> ResultErrDebugExt<T> for Result<T, ERR> {
     fn map_error_dbg(self) -> DisplayishResult<T, impl Display> {
@@ -270,5 +270,5 @@ impl<T, ERR: Debug> ResultErrDebugExt<T> for Result<T, ERR> {
     }
 
     #[allow(private_interfaces)]
-    fn _seal(&self, _: SealedTraitFunParam) {}
+    fn _seal(&self, _: Seal) {}
 }

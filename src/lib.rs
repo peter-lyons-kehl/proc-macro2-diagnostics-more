@@ -9,7 +9,7 @@ use alloc::string::{String, ToString as _};
 #[cfg(any(feature = "alloc", feature = "proc-macro2-diagnostics"))]
 use core::any::Any;
 
-#[cfg(feature = "proc-macro2-diagnostics")]
+#[cfg(feature = "proc-macro2")]
 use proc_macro2::Span;
 
 use core::fmt::{self, Display, Formatter};
@@ -25,22 +25,23 @@ pub type DisplayishResult<T, D = String, EX = ()> = Result<T, Displayish<D, EX>>
 
 /// Intentionally NOT public - it will change if we ever support macro diagnostic levels other than [Level::Error].
 #[cfg(feature = "proc-macro2-diagnostics")]
-struct LevelLike;
+#[derive(Clone, Debug)]
+pub struct LevelLike {
+    _seal: Seal,
+}
+const LEVEL_LIKE: LevelLike = LevelLike { _seal: SEAL };
 
 //-----
 #[cfg(feature = "proc-macro2-diagnostics")]
-#[allow(private_interfaces)]
 pub type MacroDeepDiagnostic<D = String> = Displayish<D, LevelLike>;
 
 #[cfg(feature = "proc-macro2-diagnostics")]
-#[allow(private_interfaces)]
 pub type MacroDeepResult<T, D = String> = Result<T, MacroDeepDiagnostic<D>>;
 
 /// Like [proc_macro2_diagnostics::Diagnostic], but its [Displayish::display] is NOT converted to
 /// [String], so that we convert it only at the top function call tree level. To convert use
 /// [SpannedDiagnostic::into_diagnostic]. <--- @TODO this docs
 #[cfg(feature = "proc-macro2-diagnostics")]
-#[allow(private_interfaces)]
 pub type MacroSpannedDiagnostic<D = String> = Displayish<D, (LevelLike, Span)>;
 
 #[cfg(feature = "proc-macro2-diagnostics")]
@@ -146,8 +147,10 @@ impl<D: Display> MacroDeepDiagnostic<D> {
     }
 }
 
-/// Intentionally not public - used to indicate a sealed trait.
-enum SealedTraitFunParam {}
+/// Intentionally NOT public - used to indicate a sealed trait/struct.
+#[derive(Clone, Debug)]
+struct Seal;
+const SEAL: Seal = Seal;
 //--------
 
 #[cfg(feature = "proc-macro2-diagnostics")]
