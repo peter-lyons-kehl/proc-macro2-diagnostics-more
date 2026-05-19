@@ -157,58 +157,9 @@ impl<D: Display> MacroSpannedDiagnostic<D> {
     }
 }
 
-//--------
-/// Similar (but only partially) to [enum_dispatch](https://crates.io/crates/enum_dispatch) and
-/// [enum_delegate](https://crates.io/crates/enum_delegate).
-///
-/// ### dyn-compatible only
-///
-/// Only for `dyn`-compatible traits.
-///
-/// ### One trait only
-///
-/// If you'd like to implement multiple traits, define a join trait that inherits all of them, and
-/// blanket implement it:
-///
-/// ```rust
-/// # use core::fmt::Display;
-/// pub trait DisplayAndError: Display + core::error::Error {}
-/// impl<T: Display + core::error::Error> DisplayAndError for T {}
-/// ```
-pub mod by_dyn {
-    /*macro_rules! variants {
-        ($vis:vis $enum:ident : $trait:path:ty
-            (
-                $(
-                    $constructor:ident -> $variant:ident
-                )*
-            )
-            (
-                //@TODO assert that trit is dyn-compatible - needed even if we use `impl`
-                $(
-                        (
-                            fn $method:ident(
-                                // leading `mut` is NOT needed - the variable itself will
-                                // never be modified, because we're just forwarding the call.
-                                //
-                                // Exactly ONE of the following three should match.
-                                $( &mut $mut_self:ident )? // &mut self
-                                $( &$ref_self:ident )? // &self
-                                $(  $val_self:ident )? // self
-
-                                ( $other_args:tt )*
-                            ) -> $result:ty
-                        )
-                        (
-                            ( $method_invocation:tt )*
-                        )
-                ),+
-            )
-        ) => {};
-    }*/
-}
-
 pub mod ext;
+
+pub mod prelude_ext;
 
 pub mod assert {
     use crate::ext::core::OptionOrBoolExt;
