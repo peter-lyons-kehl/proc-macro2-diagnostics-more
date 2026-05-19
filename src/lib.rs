@@ -14,12 +14,6 @@ use proc_macro2::Span;
 
 use core::fmt::{self, Display, Formatter};
 
-// @TODO
-//
-//#[cfg(feature = "proc-macro2")]
-//
-//use proc_macro2::Span;
-
 #[cfg(feature = "proc-macro2-diagnostics")]
 use proc_macro2_diagnostics::{Diagnostic as PmDiagnostic, Level};
 
