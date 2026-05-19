@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "proc-macro2-diagnostics"), no_std)]
+#![cfg_attr(not(feature = "proc-macro2"), no_std)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -8,6 +8,9 @@ use alloc::string::{String, ToString as _};
 
 #[cfg(any(feature = "alloc", feature = "proc-macro2-diagnostics"))]
 use core::any::Any;
+
+#[cfg(feature = "proc-macro2-diagnostics")]
+use proc_macro2::Span;
 
 use core::fmt::{self, Display, Formatter};
 
