@@ -9,7 +9,7 @@ use alloc::string::{String, ToString as _};
 #[cfg(any(feature = "alloc", feature = "proc-macro2-diagnostics"))]
 use core::any::Any;
 
-#[cfg(feature = "proc-macro2")]
+#[cfg(feature = "proc-macro2-diagnostics")]
 use proc_macro2::Span;
 
 use core::fmt::{self, Display, Formatter};
@@ -23,13 +23,19 @@ pub type DisplayishResult<T, D, EX = ()> = Result<T, Displayish<D, EX>>;
 #[cfg(feature = "alloc")]
 pub type DisplayishResult<T, D = String, EX = ()> = Result<T, Displayish<D, EX>>;
 
+/// Intentionally NOT public - used to indicate a sealed trait/struct.
+#[derive(Clone, Debug)]
+struct Seal;
+const _SEAL: Seal = Seal;
+
 /// Intentionally NOT public - it will change if we ever support macro diagnostic levels other than [Level::Error].
 #[cfg(feature = "proc-macro2-diagnostics")]
 #[derive(Clone, Debug)]
 pub struct LevelLike {
     _seal: Seal,
 }
-const LEVEL_LIKE: LevelLike = LevelLike { _seal: SEAL };
+#[cfg(feature = "proc-macro2-diagnostics")]
+const LEVEL_LIKE: LevelLike = LevelLike { _seal: _SEAL };
 
 //-----
 #[cfg(feature = "proc-macro2-diagnostics")]
@@ -146,11 +152,6 @@ impl<D: Display> MacroDeepDiagnostic<D> {
         }
     }
 }
-
-/// Intentionally NOT public - used to indicate a sealed trait/struct.
-#[derive(Clone, Debug)]
-struct Seal;
-const SEAL: Seal = Seal;
 //--------
 
 #[cfg(feature = "proc-macro2-diagnostics")]
