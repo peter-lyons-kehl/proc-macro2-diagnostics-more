@@ -8,7 +8,7 @@ rust-version = "1.78.0"
 license = "BSD-2-Clause OR Apache-2.0 OR MIT"
 
 authors = ["Peter Lyons Kehl<peter.kehl@gmail.com>"]
-description = "Dis(playish): Wrappers, trait extensions and asserts to wrap type(s) implementing Display and an optional extra. Use with proc-macro2-diagnostics. no-std and no-alloc: A subset of the functionality accepts Display (instead of String)."
+description = "Dis(playish): Wrappers, trait extensions and asserts to wrap type(s) implementing Display and an optional extra. Use with proc-macro2-diagnostics, no-std and no-alloc: A subset of the functionality accepts Display (instead of String)."
 
 categories = ["development-tools", "no-std", "no-std::no-alloc", "rust-patterns"]
 

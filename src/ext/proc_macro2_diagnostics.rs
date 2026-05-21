@@ -80,8 +80,8 @@ impl<T: ToString> ToStringExt for T {
 }
 //------
 pub trait ResultErrToDisplayExt<T> {
-    fn map_error_to_at(self, span: Span) -> MacroDiagnosticResult<T>;
-    fn map_error_to_with_at<FD: Display, F: Fn() -> FD>(
+    fn map_err_to_at(self, span: Span) -> MacroDiagnosticResult<T>;
+    fn map_err_to_with_at<FD: Display, F: Fn() -> FD>(
         self,
         f: F,
         span: Span,
@@ -91,11 +91,11 @@ pub trait ResultErrToDisplayExt<T> {
     fn _seal(&self, _: Seal);
 }
 impl<T, ERR: ToString> ResultErrToDisplayExt<T> for Result<T, ERR> {
-    fn map_error_to_at(self, span: Span) -> MacroDiagnosticResult<T> {
+    fn map_err_to_at(self, span: Span) -> MacroDiagnosticResult<T> {
         self.map_err(|e| span.error(e.to_string()))
     }
     #[cfg(feature = "proc-macro2-diagnostics")]
-    fn map_error_to_with_at<FD: Display, F: Fn() -> FD>(
+    fn map_err_to_with_at<FD: Display, F: Fn() -> FD>(
         self,
         f: F,
         span: Span,

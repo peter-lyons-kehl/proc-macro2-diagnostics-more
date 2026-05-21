@@ -25,17 +25,17 @@ impl<T: ToString> ToStringExt for T {
 }
 
 pub trait ResultErrToDisplayExt<T> {
-    fn map_error_to(self) -> DisplayishResult<T>;
-    fn map_error_to_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T>;
+    fn map_err_to(self) -> DisplayishResult<T>;
+    fn map_err_to_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T>;
 
     #[allow(private_interfaces)]
     fn _seal(&self, _: Seal);
 }
 impl<T, ERR: ToString> ResultErrToDisplayExt<T> for Result<T, ERR> {
-    fn map_error_to(self) -> DisplayishResult<T> {
+    fn map_err_to(self) -> DisplayishResult<T> {
         self.map_err(|e| Displayish::new_from_display(e.to_string()))
     }
-    fn map_error_to_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T> {
+    fn map_err_to_with<FD: Display, F: Fn() -> FD>(self, f: F) -> DisplayishResult<T> {
         self.map_err(|e| {
             let s = format!("{} {}", f(), e.to_string());
             Displayish::new_from_display(s)
