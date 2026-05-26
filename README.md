@@ -1,4 +1,4 @@
-# dis(playish)
+# Dis(playish)
 
 ## Goal
 
@@ -26,3 +26,7 @@ specify/generate the content.
 Default featureset is `no_std`-compatible. It's limited, but it can be used even without
 `proc-macro2-diagnostics`. To use `proc-macro2-diagnostics` functionality (`Diagnostic` etc.),
 enable cargo feature `proc-macro2-diagnostics`.
+
+[`Display`]: https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html
+[`bool`]: https://doc.rust-lang.org/nightly/core/primitive.bool.html
+[`Option`]: https://doc.rust-lang.org/nightly/core/option/enum.Option.html

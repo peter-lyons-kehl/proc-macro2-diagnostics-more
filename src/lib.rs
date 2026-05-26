@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "proc-macro2"), no_std)]
+#![doc = include_str!("../README.md")]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -28,7 +29,6 @@ pub type DisplayishResult<T, D = String, EX = ()> = Result<T, Displayish<D, EX>>
 struct Seal;
 const _SEAL: Seal = Seal;
 
-/// Intentionally NOT public - it will change if we ever support macro diagnostic levels other than [Level::Error].
 #[cfg(feature = "proc-macro2-diagnostics")]
 #[derive(Clone, Debug)]
 pub struct LevelLike {
@@ -54,10 +54,8 @@ pub type MacroSpannedDiagnostic<D = String> = Displayish<D, (LevelLike, Span)>;
 pub type MacroDiagnosticResult<T> = Result<T, PmDiagnostic>;
 //-----
 
-/*#[cfg(feature = "proc-macro2")]
-pub type MacroSpannedResult<T, D> = Result<T, SpannedDiagnostic<D>>;*/
-
-mod structures {
+/// Don't use directly. Not a part of the public API.
+pub mod structures {
     use core::fmt::Display;
     #[derive(Clone, Debug)]
     pub struct Displayish<D: Display, EX = ()> {
